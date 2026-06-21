@@ -21,6 +21,7 @@
   <ItemGroup>
     <!-- EF Core = the tool that turns C# classes into database tables for you. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.6" />
+    <PackageReference Include="SendGrid" Version="9.29.3" />
     <!-- SQLite = a tiny database that lives in a single file. Zero setup, free. -->
     <!-- Swagger = an auto-generated web page to test your API in the browser. -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
