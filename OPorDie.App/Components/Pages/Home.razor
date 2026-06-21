@@ -1,0 +1,256 @@
+@page "/"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject AppDbContext Db
+
+<h1>Captain's Log</h1>
+<p class="muted">Your One Piece TCG command center — meta, your collection, and intel.</p>
+
+@if (cardCount < 100)
+{
+    <div class="toast">
+        <h3><span class="spin">⚙️</span> Summoning the card vault…</h3>
+        <p style="margin:.2rem 0">
+            The full card library is loading in the background — a one-time ritual (~30–60s).
+            Once done it lives on your machine, so future launches are instant.
+            <strong>Refresh</strong> in a moment.
+        </p>
+        <p style="margin:.2rem 0 0">☠ Newest sets (OP16 + parallels)? Run the official import on the <a href="import">Import</a> page.</p>
+    </div>
+}
+
+<div class="stats">
+    <div class="stat"><div class="big">@cardCount</div><div class="lbl">Cards in vault</div></div>
+    <div class="stat"><div class="big">@setCount</div><div class="lbl">Sets</div></div>
+    <div class="stat"><div class="big">@ownedCount</div><div class="lbl">Cards owned</div></div>
+    <div class="stat"><div class="big">$@collectionValue.ToString("N0")</div><div class="lbl">Collection value</div></div>
+    <div class="stat"><div class="big">@deckCount</div><div class="lbl">Saved decks</div></div>
+</div>
+
+<!-- BIG META PIE — each slice cropped to the deck's Leader card -->
+<div class="panel" style="margin-top:1.6rem">
+    <h2>🏴‍☠️ Current Meta — Top Decks</h2>
+    <p class="muted" style="margin-top:0">OP-16 format · each slice is the deck's Leader, sized by recent tournament wins.</p>
+    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center; justify-content:center">
+        <svg viewBox="0 0 320 320" width="100%" style="max-width:440px">
+            <defs>
+                @for (int i = 0; i < metaSlices.Count; i++)
+                {
+                    <clipPath id="@($"ms{i}")"><path d="@metaSlices[i].Path"></path></clipPath>
+                }
+            </defs>
+            @for (int i = 0; i < metaSlices.Count; i++)
+            {
+                var s = metaSlices[i];
+                <g clip-path="url(#@($"ms{i}"))">
+                    @if (s.Img is not null)
+                    {
+                        <image href="@s.Img" x="@N(s.MidX - 140)" y="@N(s.MidY - 170)" width="280" height="392" preserveAspectRatio="xMidYMid slice"></image>
+                    }
+                    else
+                    {
+                        <path d="@s.Path" fill="@s.Color"></path>
+                    }
+                </g>
+                <path d="@s.Path" fill="none" stroke="#0d1014" stroke-width="2.5"></path>
+            }
+        </svg>
+        <div style="flex:1; min-width:210px">
+            @foreach (var s in metaSlices)
+            {
+                <div style="display:flex; align-items:center; gap:.5rem; margin:.3rem 0">
+                    <span style="width:14px; height:14px; border-radius:4px; background:@s.Color; display:inline-block"></span>
+                    <span>@s.Label</span>
+                    <span class="muted" style="margin-left:auto">@s.Value wins</span>
+                </div>
+            }
+            <p class="muted" style="font-size:.8rem; margin-top:.6rem">Live lists on <a href="topdecks">Top Decks</a>.</p>
+        </div>
+    </div>
+</div>
+
+<div class="dash-grid">
+
+    <!-- COLLECTION by color -->
+    <div class="panel">
+        <h2>Your Collection — Colors</h2>
+        @if (colorSlices.Count == 0)
+        {
+            <p class="muted">No cards owned yet. Open packs or add from Browse.</p>
+        }
+        else
+        {
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center">
+                <svg viewBox="0 0 220 220" width="200" height="200">
+                    @foreach (var s in colorSlices)
+                    {
+                        <path d="@s.Path" fill="@s.Color" stroke="#0d1014" stroke-width="2"></path>
+                    }
+                </svg>
+                <div style="flex:1; min-width:150px">
+                    @foreach (var s in colorSlices)
+                    {
+                        <div style="display:flex; align-items:center; gap:.5rem; margin:.2rem 0">
+                            <span style="width:12px; height:12px; border-radius:3px; background:@s.Color; display:inline-block"></span>
+                            <span>@s.Label</span><span class="muted" style="margin-left:auto">@s.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- COLLECTION by rarity (bars) -->
+    <div class="panel">
+        <h2>Your Collection — Rarity</h2>
+        @if (rarityBars.Count == 0)
+        {
+            <p class="muted">Nothing owned yet.</p>
+        }
+        else
+        {
+            @foreach (var b in rarityBars)
+            {
+                <div style="display:flex; align-items:center; gap:.5rem; margin:.3rem 0">
+                    <span style="width:42px"><span class="rarity @b.code">@b.code</span></span>
+                    <div style="height:16px; border-radius:4px; background:linear-gradient(90deg,var(--blood),var(--gold)); width:@N(Math.Max(6, b.count * 200.0 / maxRarity))px"></div>
+                    <span class="muted">@b.count</span>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- BANNED / RESTRICTED -->
+    <div class="panel">
+        <h2>Banned & Restricted</h2>
+        <p class="muted">The official ban/restriction list changes each format — always confirm before an event.</p>
+        <a class="btn-link" href="https://en.onepiece-cardgame.com/rules/restriction/" target="_blank">⚖️ Official restriction list</a>
+    </div>
+
+    <!-- FACTS & TIPS -->
+    <div class="panel">
+        <h2>Know the Ropes</h2>
+        <ul class="tips">
+            @foreach (var t in tips)
+            {
+                <li>@t</li>
+            }
+        </ul>
+    </div>
+
+    <!-- COMMUNITY -->
+    <div class="panel">
+        <h2>Community & Discord</h2>
+        <p class="muted">Find players, lists, and discussion.</p>
+        <div class="link-row">
+            <a class="btn-link" href="https://discord.gg/onepiececardgame" target="_blank">💬 Discord</a>
+            <a class="btn-link secondary-link" href="https://www.reddit.com/r/OnePieceTCG/" target="_blank">👽 r/OnePieceTCG</a>
+            <a class="btn-link secondary-link" href="https://onepiece.limitlesstcg.com/" target="_blank">🏆 Limitless</a>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private int cardCount, setCount, ownedCount, deckCount;
+    private decimal collectionValue;
+
+    private record Slice(string Label, double Value, string Color, string? Img, string Path, double MidX, double MidY);
+    private List<Slice> metaSlices = new();
+    private List<Slice> colorSlices = new();
+    private List<(string code, int count)> rarityBars = new();
+    private int maxRarity = 1;
+
+    private readonly string[] tips =
+    {
+        "You start with 5 cards; you may mulligan your whole opening hand once.",
+        "DON!! powers everything — you gain 1 per turn (up to 10) to pay costs and boost attackers.",
+        "A constructed deck is exactly 50 cards plus 1 Leader, max 4 copies of any card number.",
+        "Counter cards (the blue number) can be played from hand during your opponent's attack to survive.",
+        "Your Leader's Life total is your clock — when it's gone and you take one more hit, you lose.",
+        "Trade tempo for value: attacking the Leader pressures life, attacking characters controls the board.",
+    };
+
+    private static readonly (string key, string label, string color, double wins)[] Meta =
+    {
+        ("teach",     "Black/Yellow Teach", "#c9a227", 22),
+        ("nami",      "Blue/Yellow Nami",   "#2f5fae", 38),
+        ("enel",      "Purple Enel",        "#7a3fb0", 35),
+        ("luffy",     "Green/Blue Luffy",   "#2f8f4f", 17),
+        ("yamato",    "Black Yamato",       "#555",    17),
+        ("ace",       "Red Ace",            "#c0182a", 16),
+        ("lucy",      "Lucy",               "#d8662f", 11),
+        ("rosinante", "Rosinante",          "#9a7bc0", 8),
+    };
+
+    private static readonly Dictionary<string,string> ColorHex = new()
+    {
+        ["Red"]="#c0182a", ["Green"]="#2f8f4f", ["Blue"]="#2f5fae",
+        ["Purple"]="#7a3fb0", ["Black"]="#4a4a4a", ["Yellow"]="#e9b84c",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        cardCount = await Db.Cards.CountAsync();
+        setCount = await Db.CardSets.CountAsync();
+        deckCount = await Db.Decks.CountAsync();
+
+        var owned = await Db.CollectionItems.Include(ci => ci.Card).ToListAsync();
+        ownedCount = owned.Sum(ci => ci.Quantity);
+        collectionValue = owned.Sum(ci => ci.Quantity * (ci.Card?.MarketPrice ?? 0));
+
+        // Try to attach a real leader card image to each meta deck.
+        var leaders = await Db.Cards.Where(c => c.Rarity == "L").ToListAsync();
+        var metaData = Meta.Select(m =>
+        {
+            var lead = leaders.FirstOrDefault(l => l.Name.Contains(m.key, StringComparison.OrdinalIgnoreCase));
+            string? img = lead is null ? null : CardImages.Url(lead.CardNumber);
+            return (m.label, m.wins, m.color, img);
+        });
+        metaSlices = BuildPie(metaData.Select(x => (x.label, x.wins, x.color, x.img)), 160, 160, 150);
+
+        // Collection by color.
+        var byColor = owned.Where(ci => ci.Card is not null && !string.IsNullOrEmpty(ci.Card!.Color))
+            .GroupBy(ci => ci.Card!.Color)
+            .Select(g => (label: g.Key, value: (double)g.Sum(x => x.Quantity),
+                          color: ColorHex.TryGetValue(g.Key, out var h) ? h : "#888", img: (string?)null))
+            .ToList();
+        colorSlices = BuildPie(byColor);
+
+        // Collection by rarity.
+        rarityBars = owned.Where(ci => ci.Card is not null)
+            .GroupBy(ci => ci.Card!.Rarity)
+            .Select(g => (code: g.Key, count: g.Sum(x => x.Quantity)))
+            .OrderByDescending(x => x.count).ToList();
+        maxRarity = rarityBars.Count > 0 ? rarityBars.Max(b => b.count) : 1;
+    }
+
+    // Build SVG pie slices from (label, value, color, optional image).
+    private List<Slice> BuildPie(IEnumerable<(string label, double value, string color, string? img)> data,
+                                 double cx = 110, double cy = 110, double r = 100)
+    {
+        var items = data.Where(d => d.value > 0).ToList();
+        double total = items.Sum(d => d.value);
+        var slices = new List<Slice>();
+        if (total <= 0) return slices;
+
+        double angle = -Math.PI / 2;
+        foreach (var d in items)
+        {
+            double sweep = d.value / total * 2 * Math.PI;
+            double a0 = angle, a1 = angle + sweep;
+            double x0 = cx + r * Math.Cos(a0), y0 = cy + r * Math.Sin(a0);
+            double x1 = cx + r * Math.Cos(a1), y1 = cy + r * Math.Sin(a1);
+            int large = sweep > Math.PI ? 1 : 0;
+            string path = $"M{N(cx)},{N(cy)} L{N(x0)},{N(y0)} A{N(r)},{N(r)} 0 {large} 1 {N(x1)},{N(y1)} Z";
+            double mid = (a0 + a1) / 2;
+            double mx = cx + r * 0.62 * Math.Cos(mid), my = cy + r * 0.62 * Math.Sin(mid);
+            slices.Add(new Slice(d.label, d.value, d.color, d.img, path, mx, my));
+            angle = a1;
+        }
+        return slices;
+    }
+
+    // Invariant number formatting so SVG paths never get a stray comma decimal.
+    private static string N(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+}

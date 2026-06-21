@@ -1,0 +1,32 @@
+<!--
+  This is the PROJECT FILE. It tells the .NET build tools three things:
+  1) What kind of program this is (a web app),
+  2) Which .NET version to use,
+  3) Which extra libraries (NuGet packages) to download.
+
+  You almost never edit this by hand once it's set up — `dotnet add package`
+  writes the <PackageReference> lines for you.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <!-- net8.0 = .NET 8, the long-term-support version. Free, cross-platform. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Nullable warns you when a value could be null (helps avoid crashes). -->
+    <Nullable>enable</Nullable>
+    <!-- ImplicitUsings auto-imports common namespaces so files are shorter. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EF Core = the tool that turns C# classes into database tables for you. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.6" />
+    <!-- SQLite = a tiny database that lives in a single file. Zero setup, free. -->
+    <!-- Swagger = an auto-generated web page to test your API in the browser. -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <!-- ASP.NET Core Identity = secure user accounts (hashing, lockout, login UI). -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.6" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.6" />
+  </ItemGroup>
+
+</Project>

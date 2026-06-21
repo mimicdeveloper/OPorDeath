@@ -1,0 +1,17 @@
+# Build and object files
+bin/
+obj/
+
+# User files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Planning documents
+Content-Calendar-90-Day.md
+Launch-and-Funding-Plan.md
+
+# Dependencies
+.DS_Store
+*.log

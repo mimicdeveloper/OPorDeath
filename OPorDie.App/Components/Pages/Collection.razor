@@ -1,0 +1,59 @@
+@page "/collection"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>My Collection</h1>
+
+@if (items is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (items.Count == 0)
+{
+    <p class="muted">Nothing here yet. Open a pack or add cards from Browse.</p>
+}
+else
+{
+    <p class="muted">Total value: <strong>$@items.Sum(i => i.Quantity * (i.Card?.MarketPrice ?? 0)).ToString("N2")</strong></p>
+    <table>
+        <thead>
+            <tr><th></th><th>Number</th><th>Name</th><th>Rarity</th><th>Qty</th><th>Value</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var i in items.OrderByDescending(i => i.Card?.MarketPrice))
+            {
+                <tr>
+                    <td><img src="@CardImages.Url(i.Card?.CardNumber ?? "")" alt="@i.Card?.Name" style="width:48px; border-radius:4px" /></td>
+                    <td>@i.Card?.CardNumber</td>
+                    <td>@i.Card?.Name</td>
+                    <td><span class="rarity @(i.Card?.Rarity)">@i.Card?.Rarity</span></td>
+                    <td>@i.Quantity</td>
+                    <td>$@((i.Quantity * (i.Card?.MarketPrice ?? 0)).ToString("N2"))</td>
+                    <td><button class="secondary" @onclick="() => Remove(i)">Remove one</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<CollectionItem>? items;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        // Include(ci => ci.Card) tells EF to also load the linked Card for each row,
+        // so we can show its name/price (otherwise i.Card would be null).
+        items = await Db.CollectionItems.Include(ci => ci.Card).ToListAsync();
+    }
+
+    private async Task Remove(CollectionItem item)
+    {
+        item.Quantity--;
+        if (item.Quantity <= 0)
+            Db.CollectionItems.Remove(item); // drop the row entirely at 0
+        await Db.SaveChangesAsync();
+        await ReloadAsync();
+    }
+}

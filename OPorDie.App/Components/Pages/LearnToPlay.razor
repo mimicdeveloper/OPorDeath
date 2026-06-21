@@ -1,0 +1,138 @@
+@page "/learn"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>Learn to Play ⚔️</h1>
+<p class="muted">A guided walkthrough of a turn, played with one of your decks. Follow the steps — each one explains a core rule and shows it happen on the board.</p>
+
+@if (!started)
+{
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
+        <span class="muted">Deck:</span>
+        <select @bind="selectedDeckId">
+            <option value="0">— choose a saved deck —</option>
+            @foreach (var d in decks)
+            {
+                <option value="@d.Id">@d.Name (@d.LeaderName)</option>
+            }
+        </select>
+        <button @onclick="Start" disabled="@(selectedDeckId == 0)">▶ Start lesson</button>
+    </div>
+    @if (decks.Count == 0)
+    {
+        <p class="muted" style="margin-top:1rem">No decks yet — build one in <a href="deckbuilder">Deck Builder</a> first.</p>
+    }
+}
+else
+{
+    <div class="lesson">
+        <div class="lesson-step">
+            <div class="lesson-count">Step @(step + 1) of @lessons.Count</div>
+            <h2>@lessons[step].title</h2>
+            <p>@lessons[step].body</p>
+            <div style="display:flex; gap:.5rem">
+                @if (step < lessons.Count - 1)
+                {
+                    <button @onclick="Next">Next →</button>
+                }
+                else
+                {
+                    <a class="btn-link" href="playtest">🎮 Practice freely in Playtest</a>
+                }
+                <button class="secondary" @onclick="Reset">↺ Restart</button>
+            </div>
+        </div>
+
+        <div class="lesson-board">
+            <div class="stats" style="margin:0 0 1rem">
+                <div class="stat"><div class="big">@life</div><div class="lbl">Your Life</div></div>
+                <div class="stat"><div class="big">@oppLife</div><div class="lbl">Opponent Life</div></div>
+                <div class="stat"><div class="big">@don</div><div class="lbl">DON!!</div></div>
+                <div class="stat"><div class="big">@drawPile.Count</div><div class="lbl">Deck</div></div>
+            </div>
+
+            <h3>Leader</h3>
+            <img src="@CardImages.Url(leaderNumber)" alt="leader" style="width:96px; border-radius:8px; border:2px solid var(--gold)" />
+
+            <h3 style="margin-top:1rem">Your board (@board.Count)</h3>
+            <div class="pack-grid">
+                @foreach (var n in board)
+                {
+                    <div class="pack-card"><img src="@CardImages.Url(n)" style="width:100%; border-radius:6px" /></div>
+                }
+            </div>
+
+            <h3 style="margin-top:1rem">Your hand (@hand.Count)</h3>
+            <div class="pack-grid">
+                @foreach (var n in hand)
+                {
+                    <div class="pack-card"><img src="@CardImages.Url(n)" style="width:100%; border-radius:6px" /></div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Deck> decks = new();
+    private int selectedDeckId;
+    private bool started;
+    private int step;
+
+    private string leaderNumber = "";
+    private List<string> drawPile = new(), hand = new(), board = new();
+    private int life = 4, oppLife = 4, don;
+    private readonly Random rng = new();
+
+    private readonly List<(string title, string body)> lessons = new()
+    {
+        ("Welcome aboard", "Your goal: knock the opponent's Life to 0, then land one more attack to win. You command a Leader and a 50-card deck. Press Next to begin your turn."),
+        ("Opening hand", "You drew 5 cards. Before the game you may mulligan once — shuffle them back and draw 5 new ones. Keep a hand with early plays; here we'll keep what we have."),
+        ("DON!! — your energy", "DON!! pays for everything. On turn 1 you place 1 DON; it grows by 1 each turn up to 10. You can also attach DON to a character or your Leader to give +1000 power when attacking."),
+        ("Main Phase — play a card", "Spend DON to play characters and events from your hand. Watch — we play a character from hand onto the board. Characters can attack starting next turn (they're 'summoning sick' this turn unless they have Rush)."),
+        ("Attack the Leader", "Turn your attacker to attack. Hitting the opponent's Leader deals 1 damage — they lose 1 Life (and see the top card of their deck as a trigger). We just dropped them by 1."),
+        ("Counters — their defense", "On your opponent's turn they can play Counter cards from hand (the blue +number) to boost a blocker's power and survive your attack. Always play around the counters they might be holding."),
+        ("End your turn", "At end of turn nothing rests forever — next turn your DON refreshes (untaps), you gain +1 DON, and you draw a card. We just refreshed and drew. Then your opponent takes their turn."),
+        ("Winning the game", "Once their Life is 0, the next successful attack wins. Balance offense and defense: pressure their Life while keeping blockers and counters for your own. That's the core loop — you've got it!"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        decks = await Db.Decks.Include(d => d.Cards).ToListAsync();
+    }
+
+    private async Task Start()
+    {
+        var deck = await Db.Decks.Include(d => d.Cards).FirstOrDefaultAsync(d => d.Id == selectedDeckId);
+        if (deck is null) return;
+
+        leaderNumber = deck.LeaderCardNumber;
+        drawPile = deck.Cards.SelectMany(c => Enumerable.Repeat(c.CardNumber, c.Quantity)).ToList();
+        Shuffle(drawPile);
+        hand.Clear(); board.Clear();
+        for (int i = 0; i < 5 && drawPile.Count > 0; i++) { hand.Add(drawPile[0]); drawPile.RemoveAt(0); }
+
+        life = 4; oppLife = 4; don = 0; step = 0; started = true;
+    }
+
+    private void Next()
+    {
+        if (step >= lessons.Count - 1) return;
+        step++;
+        switch (step)
+        {
+            case 2: don = 1; break;                                  // DON phase
+            case 3: if (hand.Count > 0) { board.Add(hand[0]); hand.RemoveAt(0); } break; // play a card
+            case 4: oppLife = Math.Max(0, oppLife - 1); break;       // attack
+            case 6: don = Math.Min(10, don + 1);                     // end turn: +1 DON, draw
+                    if (drawPile.Count > 0) { hand.Add(drawPile[0]); drawPile.RemoveAt(0); } break;
+        }
+    }
+
+    private void Reset() { started = false; step = 0; }
+
+    private void Shuffle(List<string> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (list[i], list[j]) = (list[j], list[i]); }
+    }
+}

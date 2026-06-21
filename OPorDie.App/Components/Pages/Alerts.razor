@@ -1,0 +1,102 @@
+@page "/alerts"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>Price Alerts</h1>
+<p class="muted">
+    Pick cards to watch and a target price. This is a <strong>preview</strong> — it lists what
+    you'd be watching using the prices we have; live re-checking is the next build step.
+</p>
+
+<div class="filters">
+    <input placeholder="Search card name…" @bind="search" @bind:event="oninput" style="min-width:220px" />
+    <select @bind="fColor"><option value="">All colors</option>@foreach (var c in colors){<option value="@c">@c</option>}</select>
+    <select @bind="fRarity"><option value="">All rarities</option>@foreach (var r in rarities){<option value="@r">@r</option>}</select>
+    <span class="muted">@Matches().Count() matches</span>
+</div>
+
+<table>
+    <thead><tr><th></th><th>Card</th><th>Rarity</th><th>Price</th><th>Target</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var c in Matches().Take(25))
+        {
+            <tr>
+                <td><img src="@CardImages.Url(c.CardNumber)" style="width:40px; border-radius:4px" /></td>
+                <td>@c.Name <span class="muted">@c.CardNumber</span></td>
+                <td><span class="rarity @c.Rarity">@c.Rarity</span></td>
+                <td>$@c.MarketPrice.ToString("N2")</td>
+                <td><input type="number" step="0.01" style="width:90px" value="@GetTarget(c)" @onchange="e => SetTarget(c, e)" /></td>
+                <td style="display:flex; gap:.3rem; flex-wrap:wrap">
+                    <button class="secondary" @onclick="() => Watch(c)">🔔 Watch</button>
+                    <button class="secondary" @onclick="() => AddToCollection(c)">➕ Own</button>
+                    <a class="btn-link secondary-link" target="_blank"
+                       href="@($"https://www.tcgplayer.com/search/one-piece-card-game/product?q={Uri.EscapeDataString(c.CardNumber)}")">📈</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (watches.Count > 0)
+{
+    <h2 style="margin-top:1.5rem">Watching (@watches.Count)</h2>
+    <table>
+        <thead><tr><th>Card</th><th>Now</th><th>Target</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var w in watches)
+            {
+                <tr>
+                    <td>@w.name <span class="muted">@w.number</span></td>
+                    <td>$@w.current.ToString("N2")</td>
+                    <td>$@w.target.ToString("N2")</td>
+                    <td>@(w.current <= w.target ? "✅ At/below target" : "⏳ Above")</td>
+                    <td><button class="secondary" @onclick="() => watches.Remove(w)">Remove</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Card> all = new();
+    private string search = "", fColor = "", fRarity = "";
+    private List<string> colors = new(), rarities = new();
+    private readonly Dictionary<string, decimal> targets = new();
+    private List<(string number, string name, decimal target, decimal current)> watches = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        all = await Db.Cards.ToListAsync();
+        colors = all.Where(c => !string.IsNullOrEmpty(c.Color)).Select(c => c.Color).Distinct().OrderBy(x => x).ToList();
+        rarities = all.Select(c => c.Rarity).Distinct().OrderBy(x => x).ToList();
+    }
+
+    private IEnumerable<Card> Matches() =>
+        all.Where(c => string.IsNullOrEmpty(search) || c.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+           .Where(c => fColor == "" || c.Color == fColor)
+           .Where(c => fRarity == "" || c.Rarity == fRarity)
+           .OrderByDescending(c => c.MarketPrice);
+
+    private decimal GetTarget(Card c) => targets.TryGetValue(c.CardNumber, out var v) ? v : Math.Round(c.MarketPrice * 0.8m, 2);
+    private void SetTarget(Card c, ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var v)) targets[c.CardNumber] = v;
+    }
+
+    private void Watch(Card c)
+    {
+        var t = GetTarget(c);
+        watches.RemoveAll(w => w.number == c.CardNumber);
+        watches.Add((c.CardNumber, c.Name, t, c.MarketPrice));
+    }
+
+    private string ownMsg = "";
+    private async Task AddToCollection(Card c)
+    {
+        var existing = await Db.CollectionItems.FirstOrDefaultAsync(ci => ci.CardId == c.Id);
+        if (existing is null) Db.CollectionItems.Add(new CollectionItem { CardId = c.Id, Quantity = 1 });
+        else existing.Quantity++;
+        await Db.SaveChangesAsync();
+        ownMsg = $"Added {c.Name} to collection.";
+    }
+}

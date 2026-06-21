@@ -1,0 +1,51 @@
+@page "/stores"
+@rendermode InteractiveServer
+
+<h1>Stores & Events</h1>
+<p class="muted">Find locals, tournaments, and where to buy near you.</p>
+
+<div style="display:flex; gap:.5rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap">
+    <input placeholder="Your city or ZIP (e.g. Austin TX)" @bind="location" @bind:event="oninput" style="min-width:240px" />
+    <button @onclick="UpdateMap">🗺️ Find game stores</button>
+</div>
+
+<div class="map-wrap">
+    <iframe title="Store map" width="100%" height="420" style="border:0; border-radius:12px"
+            loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+            src="@MapUrl"></iframe>
+</div>
+
+<h2 style="margin-top:1.6rem">Official tournaments & registration</h2>
+<p class="muted">
+    Bandai runs sanctioned One Piece events through Bandai TCG+. Create a free account there
+    to register for locals, regionals, and store tournaments near you.
+</p>
+<div class="link-row">
+    <a class="btn-link" href="https://www.bandai-tcg-plus.com/" target="_blank">🏴‍☠️ Bandai TCG+ — events & sign up</a>
+    <a class="btn-link" href="https://www.bandai-tcg-plus.com/event/search" target="_blank">📅 Search official events</a>
+    <a class="btn-link" href="@StoreSearchUrl" target="_blank">🛒 TCGplayer store locator</a>
+    <a class="btn-link" href="https://en.onepiece-cardgame.com/events/" target="_blank">⚓ Official OP event page</a>
+</div>
+
+<p class="muted" style="margin-top:1.5rem; font-size:.85rem">
+    Tip for your shop plan: these are exactly the events you'd want your future store listed
+    on. Once you're a Bandai-sanctioned location, your store shows up in this same locator.
+</p>
+
+@code {
+    private string location = "";
+    private string mapQuery = "one piece card game store near me";
+
+    private string MapUrl =>
+        $"https://www.google.com/maps?q={Uri.EscapeDataString(mapQuery)}&output=embed";
+
+    private string StoreSearchUrl =>
+        "https://www.tcgplayer.com/locator?productLineName=one-piece-card-game";
+
+    private void UpdateMap()
+    {
+        mapQuery = string.IsNullOrWhiteSpace(location)
+            ? "one piece card game store near me"
+            : $"hobby game store {location}";
+    }
+}

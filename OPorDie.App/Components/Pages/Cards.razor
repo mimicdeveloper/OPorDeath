@@ -1,0 +1,124 @@
+@page "/cards"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>Browse Cards</h1>
+
+<div class="filters">
+    <input placeholder="Search name or effect…" @bind="Search" @bind:event="oninput" style="min-width:220px" />
+    <select @bind="FColor"><option value="">All colors</option>@foreach (var c in colors){<option value="@c">@c</option>}</select>
+    <select @bind="FType"><option value="">All types</option>@foreach (var t in types){<option value="@t">@t</option>}</select>
+    <select @bind="FRarity"><option value="">All rarities</option>@foreach (var r in rarities){<option value="@r">@r</option>}</select>
+    <select @bind="FCost"><option value="-1">Any cost</option>@for (int i = 0; i <= 10; i++){<option value="@i">Cost @i</option>}</select>
+</div>
+
+@{
+    var matches = Filtered().ToList();
+    var totalPages = Math.Max(1, (int)Math.Ceiling(matches.Count / (double)pageSize));
+    if (page >= totalPages) page = totalPages - 1;
+    var pageItems = matches.Skip(page * pageSize).Take(pageSize).ToList();
+}
+
+<div class="pager">
+    <button class="secondary" @onclick="Prev" disabled="@(page == 0)">← Prev</button>
+    <span class="muted">Page @(page + 1) of @totalPages · @matches.Count cards</span>
+    <button class="secondary" @onclick="() => Next(totalPages)" disabled="@(page >= totalPages - 1)">Next →</button>
+</div>
+
+<div class="browse-layout">
+    <div class="grid-area">
+        <div class="pack-grid">
+            @foreach (var c in pageItems)
+            {
+                <div class="pack-card @(selected?.CardNumber == c.CardNumber ? "sel" : "")" style="cursor:pointer" @onclick="() => selected = c">
+                    <img src="@CardImages.Url(c.CardNumber)" alt="@c.Name" style="width:100%; border-radius:6px" loading="lazy" />
+                    <div class="nm" style="font-size:.8rem">@c.Name</div>
+                    <span class="rarity @c.Rarity">@c.Rarity</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (selected is not null)
+    {
+        <div class="detail">
+            <img src="@CardImages.Url(selected.CardNumber)" alt="@selected.Name" style="width:100%; border-radius:8px" />
+            <h2 style="margin:.5rem 0 0">@selected.Name</h2>
+            <p class="muted" style="margin:.2rem 0">@selected.CardNumber · <span class="rarity @selected.Rarity">@selected.Rarity</span></p>
+            <table>
+                <tbody>
+                    <tr><th>Type</th><td>@selected.CardType</td></tr>
+                    <tr><th>Color</th><td>@selected.Color</td></tr>
+                    @if (selected.Cost > 0)    { <tr><th>Cost</th><td>@selected.Cost</td></tr> }
+                    @if (selected.Power > 0)   { <tr><th>Power</th><td>@selected.Power</td></tr> }
+                    @if (selected.Counter > 0) { <tr><th>Counter</th><td>+@selected.Counter</td></tr> }
+                    @if (selected.Life > 0)    { <tr><th>Life</th><td>@selected.Life</td></tr> }
+                    @if (!string.IsNullOrEmpty(selected.Attribute)) { <tr><th>Attribute</th><td>@selected.Attribute</td></tr> }
+                    @if (!string.IsNullOrEmpty(selected.Traits))    { <tr><th>Traits</th><td>@selected.Traits</td></tr> }
+                    <tr><th>Price</th><td>$@selected.MarketPrice.ToString("N2")</td></tr>
+                </tbody>
+            </table>
+            @if (!string.IsNullOrEmpty(selected.Effect))
+            {
+                <p style="white-space:pre-wrap; line-height:1.4">@selected.Effect</p>
+            }
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-top:.3rem">
+                <button @onclick="() => AddToCollection(selected)">+ Add to collection</button>
+                <a class="btn-link secondary-link" target="_blank"
+                   href="@($"https://www.tcgplayer.com/search/one-piece-card-game/product?q={Uri.EscapeDataString(selected.CardNumber)}")">
+                    📈 Price & history on TCGplayer
+                </a>
+            </div>
+            <span class="muted">@addMsg</span>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Card> all = new();
+    private Card? selected;
+    private int page = 0;
+    private const int pageSize = 60;
+    private string addMsg = "";
+
+    private List<string> colors = new(), types = new(), rarities = new();
+
+    // Filter fields are properties so that changing any of them resets to page 1.
+    private string _search = "", _color = "", _type = "", _rarity = "";
+    private int _cost = -1;
+    private string Search { get => _search; set { _search = value; page = 0; } }
+    private string FColor { get => _color; set { _color = value; page = 0; } }
+    private string FType { get => _type; set { _type = value; page = 0; } }
+    private string FRarity { get => _rarity; set { _rarity = value; page = 0; } }
+    private int FCost { get => _cost; set { _cost = value; page = 0; } }
+
+    protected override async Task OnInitializedAsync()
+    {
+        all = await Db.Cards.ToListAsync();
+        colors = all.Where(c => !string.IsNullOrEmpty(c.Color)).Select(c => c.Color).Distinct().OrderBy(x => x).ToList();
+        types = all.Where(c => !string.IsNullOrEmpty(c.CardType)).Select(c => c.CardType).Distinct().OrderBy(x => x).ToList();
+        rarities = all.Select(c => c.Rarity).Distinct().OrderBy(x => x).ToList();
+    }
+
+    private IEnumerable<Card> Filtered() =>
+        all.Where(c => string.IsNullOrEmpty(_search)
+                       || c.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
+                       || c.Effect.Contains(_search, StringComparison.OrdinalIgnoreCase))
+           .Where(c => _color == "" || c.Color == _color)
+           .Where(c => _type == "" || c.CardType == _type)
+           .Where(c => _rarity == "" || c.Rarity == _rarity)
+           .Where(c => _cost < 0 || c.Cost == _cost)
+           .OrderBy(c => c.CardNumber);
+
+    private void Prev() { if (page > 0) page--; }
+    private void Next(int totalPages) { if (page < totalPages - 1) page++; }
+
+    private async Task AddToCollection(Card card)
+    {
+        var existing = await Db.CollectionItems.FirstOrDefaultAsync(ci => ci.CardId == card.Id);
+        if (existing is null) Db.CollectionItems.Add(new CollectionItem { CardId = card.Id, Quantity = 1 });
+        else existing.Quantity++;
+        await Db.SaveChangesAsync();
+        addMsg = "Added!";
+    }
+}

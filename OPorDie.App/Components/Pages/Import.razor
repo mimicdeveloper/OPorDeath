@@ -1,0 +1,82 @@
+@page "/import"
+@rendermode InteractiveServer
+@inject CardImporter Importer
+@inject BandaiScraper Scraper
+@inject AppDbContext Db
+
+<h1>Import Card Database</h1>
+<p class="muted">
+    Pulls the full card list from <a href="https://optcgapi.com" target="_blank">optcgapi.com</a>
+    into your app so the Deck Builder has every card (with images, cost, color). This can take
+    a minute. Your sample cards stay as a fallback.
+</p>
+
+<p>Cards currently in your database: <strong>@cardCount</strong></p>
+
+<button @onclick="RunImport" disabled="@busy">@(busy ? "Importing… please wait" : "⬇ Import from optcgapi (OP01–15)")</button>
+<button class="secondary" @onclick="RunBandai" disabled="@busy" style="margin-left:.5rem">@(busy ? "Working…" : "🏴‍☠️ Import EVERYTHING from official Bandai (incl. OP16 + parallels)")</button>
+<p class="@(error ? "" : "muted")" style="@(error ? "color:#ff6b6b" : "")">@status</p>
+<p class="muted" style="font-size:.8rem">The official import reads en.onepiece-cardgame.com directly and is the complete source, but it's experimental — if it parses 0, the raw block below tells us how to fix it.</p>
+
+@if (!string.IsNullOrEmpty(sample))
+{
+    <p class="muted">First record received (paste this to your helper if fields look wrong):</p>
+    <textarea readonly rows="8" style="width:100%; font-family:monospace; font-size:.75rem">@sample</textarea>
+}
+
+@code {
+    private bool busy, error;
+    private string status = "";
+    private string sample = "";
+    private int cardCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cardCount = await Db.Cards.CountAsync();
+    }
+
+    private async Task RunImport()
+    {
+        busy = true; error = false; status = "Contacting optcgapi.com…";
+        StateHasChanged();
+        try
+        {
+            var n = await Importer.ImportAllAsync();
+            cardCount = await Db.Cards.CountAsync();
+            sample = Importer.SampleJson;
+            status = n == 0
+                ? "Connected, but parsed 0 cards — the API's field names may differ. See the sample below."
+                : $"Done! Imported/updated {n} cards. You now have {cardCount} in your database.";
+            error = n == 0;
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            status = $"Import failed: {ex.Message} {(ex.InnerException is null ? "" : "→ " + ex.InnerException.Message)}";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task RunBandai()
+    {
+        busy = true; error = false; status = "Scraping the official Bandai card list… this can take a couple of minutes.";
+        StateHasChanged();
+        try
+        {
+            var n = await Scraper.ImportAllAsync();
+            cardCount = await Db.Cards.CountAsync();
+            sample = Scraper.SampleBlock;
+            status = n == 0
+                ? $"Reached the site ({Scraper.SeriesFound} series found) but parsed 0 cards — the markup differs. See the raw block below."
+                : $"Done! The official list gave {cardCount} total cards (from {Scraper.SeriesFound} series).";
+            error = n == 0;
+        }
+        catch (Exception ex)
+        {
+            error = true;
+            sample = Scraper.SampleBlock;
+            status = $"Official import failed: {ex.Message} {(ex.InnerException is null ? "" : "→ " + ex.InnerException.Message)}";
+        }
+        finally { busy = false; }
+    }
+}

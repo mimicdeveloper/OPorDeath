@@ -1,0 +1,23 @@
+@* App.razor is the ROOT of the UI — it's the actual HTML page the browser loads.
+   Everything else renders inside <Routes />. You rarely change this file. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Pirata+One&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="icon" href="logo.svg" type="image/svg+xml" />
+    <title>OP or Death ☠</title>
+    <HeadOutlet />
+</head>
+<body>
+    @* Routes decides which page to show based on the URL. *@
+    <Routes />
+    @* This script is the Blazor engine that connects buttons to your C#. *@
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

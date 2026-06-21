@@ -1,0 +1,145 @@
+@page "/sim"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>Pack Simulator</h1>
+<p class="muted">Crack a pack: 10 cards up front, and the last two are face-down foils — click them to flip and reveal your hits.</p>
+
+<div style="display:flex; gap:.5rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap">
+    <span class="muted">Set:</span>
+    <select @bind="selectedSet">
+        <option value="">— choose a set —</option>
+        @foreach (var s in sets)
+        {
+            <option value="@s.Code">@s.Code @(string.IsNullOrWhiteSpace(s.Name) || s.Name == s.Code ? "" : "— " + s.Name)</option>
+        }
+    </select>
+    <button @onclick="OpenPack" disabled="@string.IsNullOrEmpty(selectedSet)">🎴 Open pack</button>
+    @if (pack.Count > 0) { <button class="secondary" @onclick="AddPackToCollection">+ Add all to collection</button> }
+    <span class="muted">@status</span>
+</div>
+
+@if (pack.Count > 0)
+{
+    <h3>Normal cards</h3>
+    <div class="pack-grid">
+        @foreach (var c in normals)
+        {
+            <div class="pack-card">
+                <img src="@CardImages.Url(c.CardNumber)" alt="@c.Name" style="width:100%; border-radius:6px" />
+                <div class="nm" style="font-size:.8rem">@c.Name</div>
+                <span class="rarity @c.Rarity">@c.Rarity</span>
+            </div>
+        }
+    </div>
+
+    <h3 style="margin-top:1.5rem">✨ Foil slots — click to flip</h3>
+    <div class="pack-grid" style="max-width:360px">
+        @for (int i = 0; i < holos.Count; i++)
+        {
+            var idx = i;
+            var c = holos[idx];
+            <div class="foil @(revealed[idx] ? "flipped" : "")" @onclick="() => Reveal(idx)">
+                @if (revealed[idx])
+                {
+                    <img src="@CardImages.Url(c.CardNumber)" alt="@c.Name" style="width:100%; border-radius:8px" />
+                    <div class="nm" style="font-size:.8rem">@c.Name</div>
+                    <span class="rarity @c.Rarity">@c.Rarity</span>
+                }
+                else
+                {
+                    <div class="foil-back">
+                        <img src="logo.svg" alt="?" style="width:64px; opacity:.85" />
+                        <div class="muted" style="font-size:.75rem; margin-top:.3rem">Tap to flip</div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<CardSet> sets = new();
+    private string selectedSet = "";
+    private string status = "";
+    private readonly Random rng = new();
+
+    private List<Card> pack = new();
+    private List<Card> normals = new();
+    private List<Card> holos = new();
+    private List<bool> revealed = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Only show sets that actually have cards.
+        var setIdsWithCards = await Db.Cards.Select(c => c.CardSetId).Distinct().ToListAsync();
+        sets = await Db.CardSets.Where(s => setIdsWithCards.Contains(s.Id)).OrderBy(s => s.Code).ToListAsync();
+    }
+
+    private async Task OpenPack()
+    {
+        status = "";
+        var all = await Db.Cards.Where(c => c.CardSet!.Code == selectedSet).ToListAsync();
+        if (all.Count == 0) { status = "No cards in that set."; return; }
+
+        var used = new HashSet<string>();
+        normals = new();
+        for (int i = 0; i < 10; i++)
+        {
+            var c = Pick(all, used, new[] { "C", "UC" });
+            if (c is not null) normals.Add(c);
+        }
+
+        // Two foil slots: a rare-ish hit, then a "special" (rarer) — no duplicates.
+        holos = new();
+        var h1 = Pick(all, used, new[] { "R", "SR" });
+        var h2 = PickWeightedSpecial(all, used);
+        if (h1 is not null) holos.Add(h1);
+        if (h2 is not null) holos.Add(h2);
+
+        revealed = holos.Select(_ => false).ToList();
+        pack = normals.Concat(holos).ToList();
+    }
+
+    // Pick a distinct card matching one of the rarities; never repeats a card.
+    private Card? Pick(List<Card> pool, HashSet<string> used, string[] rarities)
+    {
+        var cands = pool.Where(c => rarities.Contains(c.Rarity) && !used.Contains(c.CardNumber)).ToList();
+        if (cands.Count == 0) cands = pool.Where(c => !used.Contains(c.CardNumber)).ToList();
+        if (cands.Count == 0) return null;
+        var pick = cands[rng.Next(cands.Count)];
+        used.Add(pick.CardNumber);
+        return pick;
+    }
+
+    // The "chase" slot: usually SR, sometimes SEC or a Leader/alt.
+    private Card? PickWeightedSpecial(List<Card> pool, HashSet<string> used)
+    {
+        var roll = rng.Next(100);
+        var order = roll < 70 ? new[] { "SR", "SEC", "L", "R" }
+                  : roll < 92 ? new[] { "SEC", "SR", "L", "R" }
+                              : new[] { "L", "SEC", "SR", "R" };
+        foreach (var r in order)
+        {
+            var c = Pick(pool, used, new[] { r });
+            if (c is not null) return c;
+        }
+        return Pick(pool, used, new[] { "R", "C", "UC" });
+    }
+
+    private void Reveal(int i) { if (i >= 0 && i < revealed.Count) revealed[i] = true; }
+
+    private async Task AddPackToCollection()
+    {
+        foreach (var card in pack)
+        {
+            var dbCard = await Db.Cards.FirstOrDefaultAsync(c => c.CardNumber == card.CardNumber);
+            if (dbCard is null) continue;
+            var existing = await Db.CollectionItems.FirstOrDefaultAsync(ci => ci.CardId == dbCard.Id);
+            if (existing is null) Db.CollectionItems.Add(new CollectionItem { CardId = dbCard.Id, Quantity = 1 });
+            else existing.Quantity++;
+        }
+        await Db.SaveChangesAsync();
+        status = "Added to collection!";
+    }
+}

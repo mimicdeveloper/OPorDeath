@@ -1,0 +1,44 @@
+@page "/mydecks"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>My Decks</h1>
+<p class="muted">Decks you've saved in the Deck Builder or imported on the Top Decks page.</p>
+
+@if (decks is null) { <p class="muted">Loading…</p> }
+else if (decks.Count == 0)
+{
+    <p class="muted">No decks yet. Build one in <a href="deckbuilder">Deck Builder</a> or import one on <a href="topdecks">Top Decks</a>.</p>
+}
+else
+{
+    <div class="pack-grid">
+        @foreach (var d in decks)
+        {
+            <div class="pack-card">
+                <img src="@CardImages.Url(d.LeaderCardNumber)" alt="leader" style="width:100%; border-radius:6px" />
+                <div class="nm">@d.Name</div>
+                <div class="muted" style="font-size:.8rem">@d.LeaderName · @d.Cards.Sum(c => c.Quantity) cards</div>
+                <div style="margin-top:.4rem; display:flex; flex-direction:column; gap:.3rem">
+                    <a class="btn-link" href="@($"deckbuilder?deck={d.Id}")">Open in Builder</a>
+                    <button class="secondary" @onclick="() => Delete(d)">Delete</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Deck>? decks;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load() => decks = await Db.Decks.Include(d => d.Cards).ToListAsync();
+
+    private async Task Delete(Deck d)
+    {
+        Db.Decks.Remove(d); // cascade removes its DeckCards too
+        await Db.SaveChangesAsync();
+        await Load();
+    }
+}

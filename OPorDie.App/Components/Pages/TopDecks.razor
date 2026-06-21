@@ -1,0 +1,133 @@
+@page "/topdecks"
+@rendermode InteractiveServer
+@using System.Text.RegularExpressions
+@inject AppDbContext Db
+
+<h1>Top Decks & Meta</h1>
+<p class="muted">
+    Current OP-16 format snapshot (June 2026). Tournament results and full decklists update
+    constantly, so the live lists live on the sites linked below — use the importer to pull
+    one straight into your app with images, then export it to OPTCGSim.
+</p>
+
+<table>
+    <thead><tr><th>Tier</th><th>Leader</th><th>Colors</th><th>Recent wins*</th></tr></thead>
+    <tbody>
+        @foreach (var d in meta)
+        {
+            <tr>
+                <td><span class="rarity @d.tierClass">@d.tier</span></td>
+                <td>@d.leader</td>
+                <td>@d.colors</td>
+                <td>@d.wins</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<p class="muted" style="font-size:.8rem">*Tournament wins, ~May 25–June 9 window. Nami also leads win rate at ~57.3%.</p>
+
+<p>
+    Live decklists & results:
+    <a href="https://onepiece.limitlesstcg.com/decks" target="_blank">Limitless</a> ·
+    <a href="https://www.optcg.one/decklists" target="_blank">optcg.one</a> ·
+    <a href="https://opmetagame.com/tournaments/" target="_blank">opmetagame</a> ·
+    <a href="https://onepiece.gg/tier-lists/" target="_blank">onepiece.gg</a>
+</p>
+
+<hr style="border-color:#232a33; margin:1.5rem 0" />
+
+<h2>Import a decklist</h2>
+<p class="muted">
+    Paste a list from any of those sites. We accept lines like <code>4xOP01-016</code>,
+    <code>4 OP01-016</code>, or <code>OP01-016 x4</code>. The first card is treated as the Leader.
+</p>
+
+<textarea rows="8" style="width:100%; font-family:monospace" placeholder="1xOP16-080&#10;4xOP09-...&#10;4xEB04-058&#10;..." @bind="rawList"></textarea>
+<div style="margin:.5rem 0">
+    <input placeholder="Deck name" @bind="importName" style="width:220px" />
+    <button @onclick="Parse">Preview</button>
+    <button @onclick="SaveImported" disabled="@(parsed.Count == 0)">💾 Save as deck</button>
+    <span class="muted">@status</span>
+</div>
+
+@if (parsed.Count > 0)
+{
+    <p class="muted">@parsed.Sum(p => p.qty) cards parsed.</p>
+    <div class="pack-grid">
+        @foreach (var p in parsed)
+        {
+            <div class="pack-card">
+                <img src="@CardImages.Url(p.number)" alt="@p.number" style="width:100%; border-radius:6px" />
+                <div class="num">@p.number</div>
+                <div class="nm">@p.qty×</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string rawList = "";
+    private string importName = "Imported Deck";
+    private string status = "";
+    private List<(string number, int qty)> parsed = new();
+
+    // Current-meta snapshot (from June 2026 research). Update as the meta shifts.
+    private record Meta(string tier, string tierClass, string leader, string colors, string wins);
+    private readonly List<Meta> meta = new()
+    {
+        new("S",  "SEC", "Marshall D. Teach (OP16-080)", "Black/Yellow", "22"),
+        new("S",  "SEC", "Monkey D. Luffy (OP16)",       "Green/Blue",   "17"),
+        new("A",  "SR",  "Nami",                          "Blue/Yellow",  "38"),
+        new("A",  "SR",  "Enel",                          "Purple",       "35"),
+        new("A",  "SR",  "Yamato",                        "Black",        "17"),
+        new("B",  "R",   "Ace",                           "Red",          "16"),
+        new("B",  "R",   "Rosinante",                     "Purple/Yellow","8"),
+        new("B",  "R",   "Lucy",                          "Red/Green",    "11"),
+        new("C",  "UC",  "Sengoku",                       "Yellow",       "6"),
+        new("C",  "UC",  "Shanks",                        "Red",          "5"),
+    };
+
+    // Pull a card number and a quantity out of each line, however it's formatted.
+    private void Parse()
+    {
+        parsed.Clear();
+        // Matches card numbers like OP16-080, EB04-058, ST01-001, P-001.
+        var numRe = new Regex(@"\b([A-Z]{1,4}\d{2}-\d{3}|P-\d{3})\b", RegexOptions.IgnoreCase);
+
+        foreach (var line in rawList.Split('\n'))
+        {
+            var m = numRe.Match(line);
+            if (!m.Success) continue;
+            var number = m.Value.ToUpperInvariant();
+
+            // Quantity = the first standalone number on the line, default 1.
+            var qtyMatch = Regex.Match(line, @"(\d+)\s*[xX]?\b");
+            int qty = 1;
+            if (qtyMatch.Success && int.TryParse(qtyMatch.Groups[1].Value, out var q) && q is > 0 and <= 4)
+                qty = q;
+
+            parsed.Add((number, qty));
+        }
+        status = parsed.Count == 0 ? "No card numbers found." : $"Parsed {parsed.Count} entries.";
+    }
+
+    private async Task SaveImported()
+    {
+        if (parsed.Count == 0) return;
+        var deck = new Deck
+        {
+            Name = string.IsNullOrWhiteSpace(importName) ? "Imported Deck" : importName,
+            LeaderCardNumber = parsed[0].number,   // convention: first line = leader
+            LeaderName = parsed[0].number,
+            Cards = parsed.Skip(1).Select(p => new DeckCard
+            {
+                CardNumber = p.number,
+                CardName = p.number,
+                Quantity = p.qty
+            }).ToList()
+        };
+        Db.Decks.Add(deck);
+        await Db.SaveChangesAsync();
+        status = $"Saved '{deck.Name}'.";
+    }
+}

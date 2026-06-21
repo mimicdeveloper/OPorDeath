@@ -1,0 +1,159 @@
+@page "/playtest"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+
+<h1>Playtest (solo goldfish)</h1>
+<p class="muted">
+    A single-player practice mat: draw, manage DON!!, play cards, attack a dummy life total.
+    There's no AI opponent and card abilities don't auto-resolve — it's for testing a deck's
+    flow and curve. For real matches, export the deck to OPTCGSim.
+</p>
+
+<div style="display:flex; gap:.5rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap">
+    <span class="muted">Deck:</span>
+    <select @bind="selectedDeckId">
+        <option value="0">— choose a saved deck —</option>
+        @foreach (var d in decks)
+        {
+            <option value="@d.Id">@d.Name (@d.LeaderName)</option>
+        }
+    </select>
+    <span class="muted">Leader life:</span>
+    <input type="number" @bind="startLife" style="width:60px" />
+    <button @onclick="StartGame">▶ Start / Reset</button>
+    <span class="muted">@status</span>
+</div>
+
+@if (started)
+{
+    <div class="stats" style="margin-bottom:1rem">
+        <div class="stat"><div class="big">@turn</div><div class="lbl">Turn</div></div>
+        <div class="stat"><div class="big">@life</div><div class="lbl">Your life
+            <button class="secondary" @onclick="() => life++">+</button>
+            <button class="secondary" @onclick="() => life--">−</button></div></div>
+        <div class="stat"><div class="big">@oppLife</div><div class="lbl">Opponent life
+            <button class="secondary" @onclick="() => oppLife--">Attack −1</button></div></div>
+        <div class="stat"><div class="big">@donActive/@donOnField</div><div class="lbl">DON!! active / on field</div></div>
+        <div class="stat"><div class="big">@drawPile.Count</div><div class="lbl">Deck left</div></div>
+        <div class="stat"><div class="big">@trash.Count</div><div class="lbl">Trash</div></div>
+    </div>
+
+    <div style="display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap">
+        <button @onclick="Draw">Draw 1</button>
+        <button class="secondary" @onclick="GiveDon" disabled="@(donActive <= 0)">Use 1 DON!! (rest)</button>
+        <button class="secondary" @onclick="EndTurn">⏭ End turn (refresh DON, +1 DON, draw)</button>
+    </div>
+
+    <h3>Leader</h3>
+    <img src="@CardImages.Url(leaderNumber)" alt="leader" style="width:110px; border-radius:8px; border:2px solid #ff4d4d" />
+
+    <h3 style="margin-top:1rem">Board — characters (@board.Count/5)</h3>
+    @if (board.Count == 0) { <p class="muted">Empty. Play characters from your hand.</p> }
+    <div class="pack-grid">
+        @foreach (var n in board.ToList())
+        {
+            <div class="pack-card">
+                <img src="@CardImages.Url(n)" alt="@n" style="width:100%; border-radius:6px" />
+                <div class="num">@n</div>
+                <button class="secondary" @onclick="() => ToTrash(n)">KO → trash</button>
+            </div>
+        }
+    </div>
+
+    <h3 style="margin-top:1rem">Hand (@hand.Count)</h3>
+    @if (hand.Count == 0) { <p class="muted">Empty.</p> }
+    <div class="pack-grid">
+        @foreach (var n in hand.ToList())
+        {
+            <div class="pack-card">
+                <img src="@CardImages.Url(n)" alt="@n" style="width:100%; border-radius:6px" />
+                <div class="num">@n</div>
+                <button @onclick="() => Play(n)" disabled="@(board.Count >= 5)">Play →</button>
+                <button class="secondary" @onclick="() => Discard(n)">Discard</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Deck> decks = new();
+    private int selectedDeckId;
+    private int startLife = 5;
+
+    private bool started;
+    private string status = "";
+    private string leaderNumber = "";
+
+    private int turn, life, oppLife;
+    private int donOnField, donActive;       // DON!! on the field and how many are active (untapped)
+    private List<string> drawPile = new();   // remaining deck, as card numbers
+    private List<string> hand = new();
+    private List<string> board = new();
+    private List<string> trash = new();
+    private readonly Random rng = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        decks = await Db.Decks.Include(d => d.Cards).ToListAsync();
+    }
+
+    private async Task StartGame()
+    {
+        var deck = await Db.Decks.Include(d => d.Cards).FirstOrDefaultAsync(d => d.Id == selectedDeckId);
+        if (deck is null) { status = "Pick a saved deck first (build one in Deck Builder)."; return; }
+
+        leaderNumber = deck.LeaderCardNumber;
+
+        // Expand each "4x OP01-016" line into 4 entries, then shuffle.
+        drawPile = deck.Cards.SelectMany(c => Enumerable.Repeat(c.CardNumber, c.Quantity)).ToList();
+        Shuffle(drawPile);
+
+        hand.Clear(); board.Clear(); trash.Clear();
+        for (int i = 0; i < 5; i++) DrawOne();   // opening hand of 5
+
+        turn = 1;
+        life = startLife;
+        oppLife = startLife;
+        donOnField = 1; donActive = 1;           // turn 1: 1 DON
+        started = true;
+        status = "New game! (Mulligan by pressing Start again.)";
+    }
+
+    private void Shuffle(List<string> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
+    private void DrawOne()
+    {
+        if (drawPile.Count == 0) return;
+        hand.Add(drawPile[0]);
+        drawPile.RemoveAt(0);
+    }
+
+    private void Draw() => DrawOne();
+    private void GiveDon() { if (donActive > 0) donActive--; }   // "spend" a DON by resting it
+
+    private void Play(string n)
+    {
+        if (board.Count >= 5) { status = "Board is full (5 characters)."; return; }
+        hand.Remove(n);
+        board.Add(n);
+    }
+
+    private void Discard(string n) { hand.Remove(n); trash.Add(n); }
+    private void ToTrash(string n) { board.Remove(n); trash.Add(n); }
+
+    private void EndTurn()
+    {
+        turn++;
+        if (donOnField < 10) donOnField++;   // add 1 DON each turn, cap 10
+        donActive = donOnField;              // all DON refresh to active
+        DrawOne();                           // draw for turn
+        status = $"Turn {turn}.";
+    }
+}

@@ -1,0 +1,10 @@
+@* A layout is the frame that wraps every page: here, a sidebar nav + the page body.
+   @inherits LayoutComponentBase gives us the @Body placeholder. *@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <NavMenu />
+    <main>
+        @Body  @* the current page renders here *@
+    </main>
+</div>

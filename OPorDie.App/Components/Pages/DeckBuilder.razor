@@ -1,0 +1,261 @@
+@page "/deckbuilder"
+@rendermode InteractiveServer
+@using System.Text.RegularExpressions
+@inject AppDbContext Db
+@inject IJSRuntime JS
+
+<h1>Deck Builder</h1>
+<p class="muted">Pick a Leader, click cards to add them. Rules are enforced automatically: max 4 copies of a card, 50 cards in the deck (plus the Leader).</p>
+
+<div style="display:flex; gap:.5rem; align-items:center; margin-bottom:1rem; flex-wrap:wrap">
+    <input placeholder="Deck name" @bind="deckName" style="width:220px" />
+    <span class="muted">Leader:</span>
+    <select @onchange="OnLeaderChanged">
+        <option value="">— choose a Leader —</option>
+        @foreach (var l in leaders)
+        {
+            <option value="@l.CardNumber" selected="@(leader?.CardNumber == l.CardNumber)">@l.CardNumber — @l.Name</option>
+        }
+    </select>
+    <button @onclick="SaveDeck" disabled="@(leader is null)">💾 Save deck</button>
+    <span class="muted">@status</span>
+</div>
+
+<details style="margin-bottom:1rem">
+    <summary style="cursor:pointer; color:var(--gold)">📋 Paste a decklist to import (OPTCGSim / Limitless format)</summary>
+    <textarea rows="6" style="width:100%; font-family:monospace; margin-top:.4rem"
+              placeholder="1xOP01-001&#10;4xOP01-016&#10;4xOP01-025…" @bind="importText"></textarea>
+    <button class="secondary" @onclick="ImportFromText">Load list into builder</button>
+    <span class="muted">@importMsg</span>
+</details>
+
+<div style="display:flex; gap:2rem; align-items:flex-start; flex-wrap:wrap">
+
+    @* LEFT: the card pool you add from *@
+    <div style="flex:1; min-width:300px">
+        <h3>Card pool</h3>
+        <input placeholder="Search by name…" @bind="search" @bind:event="oninput" style="width:100%; margin-bottom:.5rem" />
+        <div class="pack-grid">
+            @foreach (var c in Pool())
+            {
+                <div class="pack-card" style="cursor:pointer" @onclick="() => Add(c)">
+                    <img src="@CardImages.Url(c.CardNumber)" alt="@c.Name" style="width:100%; border-radius:6px" />
+                    <div class="nm" style="font-size:.85rem">@c.Name</div>
+                    <span class="rarity @c.Rarity">@c.Rarity</span>
+                    <span class="muted" style="font-size:.75rem"> @Count(c.CardNumber)/4</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* RIGHT: the deck you're building *@
+    <div style="flex:1; min-width:300px">
+        <h3>Your deck — @TotalCards()/50 @(leader is null ? "" : $"(Leader: {leader.Name})")</h3>
+
+        @if (leader is not null)
+        {
+            <img src="@CardImages.Url(leader.CardNumber)" alt="leader" style="width:120px; border-radius:8px; border:2px solid #ff4d4d" />
+        }
+
+        @if (chosen.Count == 0)
+        {
+            <p class="muted">No cards yet. Click cards on the left to add them.</p>
+        }
+        else
+        {
+            <table>
+                <tbody>
+                    @foreach (var item in chosen.OrderBy(c => c.card.CardNumber))
+                    {
+                        <tr>
+                            <td>@item.card.CardNumber</td>
+                            <td>@item.card.Name</td>
+                            <td>
+                                <button class="secondary" @onclick="() => Remove(item.card)">−</button>
+                                <strong style="margin:0 .4rem">@item.qty</strong>
+                                <button class="secondary" @onclick="() => Add(item.card)">+</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <h3 style="margin-top:1.5rem">Cost curve</h3>
+            @* A tiny text-based histogram — no chart library needed. *@
+            @foreach (var bucket in CostCurve())
+            {
+                <div style="display:flex; align-items:center; gap:.5rem; margin:.15rem 0">
+                    <span style="width:60px" class="muted">Cost @bucket.cost</span>
+                    <div style="height:14px; background:#ff4d4d; border-radius:3px; width:@(bucket.count * 18)px"></div>
+                    <span class="muted">@bucket.count</span>
+                </div>
+            }
+
+            <h3 style="margin-top:1.5rem">Export to OPTCGSim</h3>
+            <p class="muted">This is the exact format OPTCGSim imports (Deck Editor → Import from Clipboard).</p>
+            <button class="secondary" @onclick="CopyExport">📋 @copyLabel</button>
+            <textarea readonly rows="8" style="width:100%; font-family:monospace; margin-top:.5rem">@ExportText()</textarea>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Card> allCards = new();
+    private List<Card> leaders = new();
+    private Card? leader;
+    private string deckName = "My Deck";
+    private string search = "";
+    private string status = "";
+
+    // The deck-in-progress: a card plus how many copies.
+    private List<(Card card, int qty)> chosen = new();
+
+    // When you open /deckbuilder?deck=3 (e.g. from My Decks), this gets set and we
+    // preload that saved deck into the builder.
+    [Parameter, SupplyParameterFromQuery(Name = "deck")]
+    public int? DeckId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        allCards = await Db.Cards.ToListAsync();
+        leaders = allCards.Where(c => c.Rarity == "L").OrderBy(c => c.CardNumber).ToList();
+
+        if (DeckId is int id)
+        {
+            var saved = await Db.Decks.Include(d => d.Cards).FirstOrDefaultAsync(d => d.Id == id);
+            if (saved is not null)
+            {
+                deckName = saved.Name;
+                leader = leaders.FirstOrDefault(l => l.CardNumber == saved.LeaderCardNumber);
+                foreach (var dc in saved.Cards)
+                {
+                    var card = allCards.FirstOrDefault(c => c.CardNumber == dc.CardNumber);
+                    if (card is not null) chosen.Add((card, dc.Quantity)); // skip cards not in DB
+                }
+            }
+        }
+    }
+
+    private void OnLeaderChanged(ChangeEventArgs e)
+    {
+        var number = e.Value?.ToString() ?? "";
+        leader = leaders.FirstOrDefault(l => l.CardNumber == number);
+    }
+
+    // The pool excludes Leaders and matches the search box.
+    private IEnumerable<Card> Pool() =>
+        allCards.Where(c => c.Rarity != "L")
+                .Where(c => string.IsNullOrEmpty(search) ||
+                            c.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.CardNumber);
+
+    private int Count(string number) => chosen.FirstOrDefault(x => x.card.CardNumber == number).qty;
+    private int TotalCards() => chosen.Sum(x => x.qty);
+
+    private void Add(Card c)
+    {
+        if (TotalCards() >= 50) { status = "Deck is full (50)."; return; }
+        var idx = chosen.FindIndex(x => x.card.CardNumber == c.CardNumber);
+        if (idx < 0) { chosen.Add((c, 1)); }
+        else
+        {
+            if (chosen[idx].qty >= 4) { status = "Max 4 copies of a card."; return; }
+            chosen[idx] = (c, chosen[idx].qty + 1);
+        }
+        status = "";
+    }
+
+    private void Remove(Card c)
+    {
+        var idx = chosen.FindIndex(x => x.card.CardNumber == c.CardNumber);
+        if (idx < 0) return;
+        if (chosen[idx].qty <= 1) chosen.RemoveAt(idx);
+        else chosen[idx] = (c, chosen[idx].qty - 1);
+        status = "";
+    }
+
+    private IEnumerable<(int cost, int count)> CostCurve()
+    {
+        // Group by the card's real play cost (filled in by the importer).
+        return chosen
+            .GroupBy(x => x.card.Cost)
+            .Select(g => (cost: g.Key, count: g.Sum(x => x.qty)))
+            .OrderBy(b => b.cost);
+    }
+
+    // OPTCGSim's import format: one "QTYxCARDNUMBER" per line, Leader first.
+    private string ExportText()
+    {
+        var lines = new List<string>();
+        if (leader is not null) lines.Add($"1x{leader.CardNumber}");
+        foreach (var x in chosen.OrderBy(c => c.card.CardNumber))
+            lines.Add($"{x.qty}x{x.card.CardNumber}");
+        return string.Join("\n", lines);
+    }
+
+    private string importText = "";
+    private string importMsg = "";
+
+    // Parse a pasted decklist ("4xOP01-016" per line, Leader first) and load it
+    // into the builder. Cards not yet in your DB are skipped (run Import first).
+    private void ImportFromText()
+    {
+        var numRe = new Regex(@"([A-Z]{1,4}\d{2}-\d{3}|P-\d{3})", RegexOptions.IgnoreCase);
+        chosen.Clear();
+        leader = null;
+        int loaded = 0, missing = 0;
+        bool firstLine = true;
+
+        foreach (var line in importText.Split('\n'))
+        {
+            var m = numRe.Match(line);
+            if (!m.Success) continue;
+            var num = m.Value.ToUpperInvariant();
+
+            var qtyMatch = Regex.Match(line, @"^\s*(\d+)\s*[xX]");
+            int qty = qtyMatch.Success && int.TryParse(qtyMatch.Groups[1].Value, out var q) ? Math.Clamp(q, 1, 4) : 1;
+
+            var card = allCards.FirstOrDefault(c => c.CardNumber == num);
+            if (card is null) { missing++; firstLine = false; continue; }
+
+            if (card.Rarity == "L" && (firstLine || leader is null)) { leader = card; firstLine = false; continue; }
+            firstLine = false;
+
+            var idx = chosen.FindIndex(x => x.card.CardNumber == num);
+            if (idx < 0) chosen.Add((card, qty));
+            else chosen[idx] = (card, Math.Min(chosen[idx].qty + qty, 4));
+            loaded += qty;
+        }
+
+        importMsg = $"Loaded {loaded} cards" + (missing > 0 ? $" · {missing} not in your library yet (run Import)" : "") + ".";
+    }
+
+    private string copyLabel = "Copy deck code";
+    private async Task CopyExport()
+    {
+        // Uses the browser's clipboard API via Blazor's JS interop.
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", ExportText());
+        copyLabel = "Copied!";
+    }
+
+    private async Task SaveDeck()
+    {
+        if (leader is null) { status = "Pick a Leader first."; return; }
+
+        var deck = new Deck
+        {
+            Name = string.IsNullOrWhiteSpace(deckName) ? "Untitled Deck" : deckName,
+            LeaderCardNumber = leader.CardNumber,
+            LeaderName = leader.Name,
+            Cards = chosen.Select(x => new DeckCard
+            {
+                CardNumber = x.card.CardNumber,
+                CardName = x.card.Name,
+                Quantity = x.qty
+            }).ToList()
+        };
+        Db.Decks.Add(deck);
+        await Db.SaveChangesAsync();
+        status = $"Saved '{deck.Name}'! ({TotalCards()} cards)";
+    }
+}
