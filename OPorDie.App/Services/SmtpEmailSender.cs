@@ -25,10 +25,11 @@ public class SmtpEmailSender : IEmailSender
 
         if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(user))
         {
-            _log.LogWarning("Email not configured — skipping send to {Email}. Set Email:Host/User/Pass in appsettings.", email);
+            _log.LogWarning("Email not configured — skipping send to {Email}.", email);
             return;
         }
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         using var client = new SmtpClient(host, port)
         {
             EnableSsl = true,
@@ -36,6 +37,6 @@ public class SmtpEmailSender : IEmailSender
         };
 
         var msg = new MailMessage(from!, email, subject, htmlMessage) { IsBodyHtml = true };
-        await client.SendMailAsync(msg);
+        await client.SendMailAsync(msg, cts.Token);
     }
 }
