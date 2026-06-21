@@ -51,32 +51,16 @@
                             </div>
                         </div>
 
-                        <!-- DON!! picker -->
-                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .4rem; text-transform:uppercase; letter-spacing:1px">
-                            DON!! Deck (×10) — <span style="color:var(--gold)">choose your art</span>
-                        </p>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; margin-bottom:.8rem">
-                            @foreach (var don in DonOptions)
-                            {
-                                var isSelected = GetDon(d) == don.Number;
-                                <div @onclick="() => SetDon(d, don.Number)"
-                                     title="Select @don.Label DON!! card for this deck"
-                                     style="cursor:pointer; border-radius:8px; border:2px solid @(isSelected ? "var(--gold)" : "#2c2230");
-                                            padding:2px; transition:border-color .15s; width:80px; flex-shrink:0">
-                                    <img src="@CardImages.Url(don.Number)" alt="@don.Label"
-                                         style="width:100%; border-radius:6px; display:block" loading="lazy" />
-                                    <div style="font-size:.6rem; text-align:center; color:@(isSelected ? "var(--gold)" : "#9a8f86"); margin-top:2px; padding-bottom:2px">
-                                        @don.Label@(isSelected ? " ✓" : "")
-                                    </div>
+                        <!-- DON!! deck -->
+                        <div style="background:#0e0b10; border:1px solid #2c2230; border-left:4px solid var(--gold);
+                                    border-radius:8px; padding:10px 14px; margin-bottom:.8rem; display:flex; align-items:center; gap:12px">
+                            <span style="font-size:1.5rem">⚡</span>
+                            <div>
+                                <div style="font-weight:700; color:var(--gold); font-size:.85rem">DON!! Deck — 10 cards</div>
+                                <div class="muted" style="font-size:.75rem">
+                                    Any DON!! card is legal regardless of color. Pick the art you like from any starter deck
+                                    (e.g. ST01, ST02 … ST13). All DON!! cards have identical effects.
                                 </div>
-                            }
-                        </div>
-                        <!-- Selected DON!! preview -->
-                        <div class="pack-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); margin-bottom:.8rem">
-                            <div class="pack-card" title="@GetDon(d) — 10 copies in your DON!! deck">
-                                <img src="@CardImages.Url(GetDon(d))" alt="DON!!" style="width:100%; border-radius:6px" loading="lazy" />
-                                <div class="num">@GetDon(d)</div>
-                                <div class="nm">10×</div>
                             </div>
                         </div>
 
@@ -144,23 +128,6 @@
         string LeaderNumber,
         List<(string number, int qty)> Cards);
 
-    private record DonOption(string Number, string Label);
-
-    // All legal DON!! cards — players can use any regardless of deck color
-    private static readonly List<DonOption> DonOptions = new()
-    {
-        new("ST01-013", "Red (ST01)"),
-        new("ST02-013", "Blue (ST02)"),
-        new("ST03-013", "Green (ST03)"),
-        new("ST04-013", "Yellow (ST04)"),
-        new("ST07-013", "Purple (ST07)"),
-        new("ST08-013", "Black (ST08)"),
-        new("ST10-013", "Red/Green (ST10)"),
-        new("ST13-013", "Black/Yellow (ST13)"),
-    };
-
-    // Tracks the selected DON!! card per deck (keyed by leader number)
-    private readonly Dictionary<string, string> selectedDon = new();
 
     // Each deck: 1 leader (separate) + exactly 50 main deck cards + 10 DON!!
     private readonly List<DeckEntry> meta = new()
@@ -232,12 +199,6 @@
     private string deckMsg = "";
     private string rawList = "", importName = "Imported Deck", status = "";
     private List<(string number, int qty)> parsed = new();
-
-    private string GetDon(DeckEntry d) =>
-        selectedDon.TryGetValue(d.LeaderNumber, out var v) ? v : DonOptions[0].Number;
-
-    private void SetDon(DeckEntry d, string number) =>
-        selectedDon[d.LeaderNumber] = number;
 
     private void Toggle(DeckEntry d) { expanded = expanded == d ? null : d; deckMsg = ""; }
 
