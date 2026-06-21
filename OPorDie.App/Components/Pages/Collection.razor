@@ -29,7 +29,8 @@ else
                     <td><span class="rarity @(i.Card?.Rarity)">@i.Card?.Rarity</span></td>
                     <td>@i.Quantity</td>
                     <td>$@((i.Quantity * (i.Card?.MarketPrice ?? 0)).ToString("N2"))</td>
-                    <td><button class="secondary" @onclick="() => Remove(i)">Remove one</button></td>
+                    <td><button class="secondary" title="Remove one copy of this card from your collection"
+                                @onclick="() => Remove(i)">Remove one</button></td>
                 </tr>
             }
         </tbody>

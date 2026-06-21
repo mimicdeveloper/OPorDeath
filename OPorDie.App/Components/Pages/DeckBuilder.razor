@@ -17,7 +17,8 @@
             <option value="@l.CardNumber" selected="@(leader?.CardNumber == l.CardNumber)">@l.CardNumber — @l.Name</option>
         }
     </select>
-    <button @onclick="SaveDeck" disabled="@(leader is null)">💾 Save deck</button>
+    <button title="Save this deck to My Decks — requires a Leader to be selected"
+            @onclick="SaveDeck" disabled="@(leader is null)">💾 Save deck</button>
     <span class="muted">@status</span>
 </div>
 
@@ -25,7 +26,8 @@
     <summary style="cursor:pointer; color:var(--gold)">📋 Paste a decklist to import (OPTCGSim / Limitless format)</summary>
     <textarea rows="6" style="width:100%; font-family:monospace; margin-top:.4rem"
               placeholder="1xOP01-001&#10;4xOP01-016&#10;4xOP01-025…" @bind="importText"></textarea>
-    <button class="secondary" @onclick="ImportFromText">Load list into builder</button>
+    <button class="secondary" title="Parse the pasted decklist and load it into the builder on the right"
+            @onclick="ImportFromText">Load list into builder</button>
     <span class="muted">@importMsg</span>
 </details>
 
@@ -38,7 +40,8 @@
         <div class="pack-grid">
             @foreach (var c in Pool())
             {
-                <div class="pack-card" style="cursor:pointer" @onclick="() => Add(c)">
+                <div class="pack-card" style="cursor:pointer" title="Click to add one copy to your deck (max 4)"
+                     @onclick="() => Add(c)">
                     <img src="@CardImages.Url(c.CardNumber)" alt="@c.Name" style="width:100%; border-radius:6px" />
                     <div class="nm" style="font-size:.85rem">@c.Name</div>
                     <span class="rarity @c.Rarity">@c.Rarity</span>

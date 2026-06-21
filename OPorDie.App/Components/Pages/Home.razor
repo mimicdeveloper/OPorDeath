@@ -58,13 +58,15 @@
         <div style="flex:1; min-width:210px">
             @foreach (var s in metaSlices)
             {
-                <div style="display:flex; align-items:center; gap:.5rem; margin:.3rem 0">
-                    <span style="width:14px; height:14px; border-radius:4px; background:@s.Color; display:inline-block"></span>
+                <a href="/topdecks" title="View full decklist and add to your collection"
+                   style="display:flex; align-items:center; gap:.5rem; margin:.3rem 0; text-decoration:none; color:inherit; cursor:pointer; border-radius:6px; padding:.2rem .3rem; transition:.12s"
+                   class="meta-legend-row">
+                    <span style="width:14px; height:14px; border-radius:4px; background:@s.Color; display:inline-block; flex-shrink:0"></span>
                     <span>@s.Label</span>
                     <span class="muted" style="margin-left:auto">@s.Value wins</span>
-                </div>
+                </a>
             }
-            <p class="muted" style="font-size:.8rem; margin-top:.6rem">Live lists on <a href="topdecks">Top Decks</a>.</p>
+            <p class="muted" style="font-size:.8rem; margin-top:.6rem">Click any deck to view its full list on <a href="topdecks">Top Decks</a>.</p>
         </div>
     </div>
 </div>

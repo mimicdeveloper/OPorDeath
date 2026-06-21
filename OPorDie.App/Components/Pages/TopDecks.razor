@@ -5,30 +5,64 @@
 
 <h1>Top Decks & Meta</h1>
 <p class="muted">
-    Current OP-16 format snapshot (June 2026). Tournament results and full decklists update
-    constantly, so the live lists live on the sites linked below — use the importer to pull
-    one straight into your app with images, then export it to OPTCGSim.
+    Current OP-16 format snapshot (June 2026). Click any deck row to view the full list,
+    save it to My Decks, or add all cards to your collection.
 </p>
 
 <table>
-    <thead><tr><th>Tier</th><th>Leader</th><th>Colors</th><th>Recent wins*</th></tr></thead>
+    <thead><tr><th>Tier</th><th>Leader</th><th>Colors</th><th>Recent wins*</th><th></th></tr></thead>
     <tbody>
         @foreach (var d in meta)
         {
-            <tr>
-                <td><span class="rarity @d.tierClass">@d.tier</span></td>
-                <td>@d.leader</td>
-                <td>@d.colors</td>
-                <td>@d.wins</td>
+            <tr style="cursor:pointer" @onclick="() => Toggle(d)" title="Click to expand decklist">
+                <td><span class="rarity @d.TierClass">@d.Tier</span></td>
+                <td><strong>@d.Leader</strong></td>
+                <td>@d.Colors</td>
+                <td>@d.Wins</td>
+                <td style="color:var(--gold)">@(expanded == d ? "▲" : "▼")</td>
             </tr>
+            @if (expanded == d)
+            {
+                <tr>
+                    <td colspan="5" style="padding:1rem; background:#0f0b14">
+                        <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:.8rem">
+                            <span class="muted" style="font-size:.9rem">@d.Cards.Sum(c => c.qty) cards</span>
+                            <button title="Save this decklist to My Decks so you can edit and playtest it"
+                                    @onclick="() => SaveDeck(d)" disabled="@busy">
+                                💾 Save to My Decks
+                            </button>
+                            <button class="secondary"
+                                    title="Add every card in this list to your Collection (up to the quantities listed)"
+                                    @onclick="() => AddToCollection(d)" disabled="@busy">
+                                📦 Add all to Collection
+                            </button>
+                            @if (!string.IsNullOrEmpty(deckMsg))
+                            {
+                                <span class="muted">@deckMsg</span>
+                            }
+                        </div>
+                        <div class="pack-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">
+                            @foreach (var c in d.Cards)
+                            {
+                                <div class="pack-card" title="@c.number — @c.qty copy/copies in this list">
+                                    <img src="@CardImages.Url(c.number)" alt="@c.number"
+                                         style="width:100%; border-radius:6px" loading="lazy" />
+                                    <div class="num">@c.number</div>
+                                    <div class="nm">@c.qty×</div>
+                                </div>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
         }
     </tbody>
 </table>
-<p class="muted" style="font-size:.8rem">*Tournament wins, ~May 25–June 9 window. Nami also leads win rate at ~57.3%.</p>
+<p class="muted" style="font-size:.8rem">*Tournament wins, ~May 25–June 9 window.</p>
 
 <p>
     Live decklists & results:
-    <a href="https://onepiece.limitlesstcg.com/decks" target="_blank">Limitless</a> ·
+    <a href="https://onepiece.limitlesstcg.com/decks" target="_blank" title="Full tournament results and top lists">Limitless</a> ·
     <a href="https://www.optcg.one/decklists" target="_blank">optcg.one</a> ·
     <a href="https://opmetagame.com/tournaments/" target="_blank">opmetagame</a> ·
     <a href="https://onepiece.gg/tier-lists/" target="_blank">onepiece.gg</a>
@@ -36,17 +70,29 @@
 
 <hr style="border-color:#232a33; margin:1.5rem 0" />
 
-<h2>Import a decklist</h2>
+<h2>Import a custom decklist</h2>
 <p class="muted">
     Paste a list from any of those sites. We accept lines like <code>4xOP01-016</code>,
     <code>4 OP01-016</code>, or <code>OP01-016 x4</code>. The first card is treated as the Leader.
 </p>
 
-<textarea rows="8" style="width:100%; font-family:monospace" placeholder="1xOP16-080&#10;4xOP09-...&#10;4xEB04-058&#10;..." @bind="rawList"></textarea>
-<div style="margin:.5rem 0">
-    <input placeholder="Deck name" @bind="importName" style="width:220px" />
-    <button @onclick="Parse">Preview</button>
-    <button @onclick="SaveImported" disabled="@(parsed.Count == 0)">💾 Save as deck</button>
+<textarea rows="8" style="width:100%; font-family:monospace"
+          placeholder="1xOP16-080&#10;4xOP09-049&#10;4xOP06-076&#10;…" @bind="rawList"></textarea>
+<div style="margin:.5rem 0; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center">
+    <input placeholder="Deck name" @bind="importName" style="width:220px"
+           title="Name for this deck in My Decks" />
+    <button title="Parse the pasted list and preview the cards below" @onclick="Parse">
+        🔍 Preview
+    </button>
+    <button title="Save the previewed list as a new deck in My Decks"
+            @onclick="SaveImported" disabled="@(parsed.Count == 0)">
+        💾 Save as deck
+    </button>
+    <button class="secondary"
+            title="Add every card from the pasted list straight into your Collection"
+            @onclick="AddParsedToCollection" disabled="@(parsed.Count == 0)">
+        📦 Add to Collection
+    </button>
     <span class="muted">@status</span>
 </div>
 
@@ -56,8 +102,9 @@
     <div class="pack-grid">
         @foreach (var p in parsed)
         {
-            <div class="pack-card">
-                <img src="@CardImages.Url(p.number)" alt="@p.number" style="width:100%; border-radius:6px" />
+            <div class="pack-card" title="@p.number — @p.qty copy/copies">
+                <img src="@CardImages.Url(p.number)" alt="@p.number"
+                     style="width:100%; border-radius:6px" loading="lazy" />
                 <div class="num">@p.number</div>
                 <div class="nm">@p.qty×</div>
             </div>
@@ -66,46 +113,151 @@
 }
 
 @code {
-    private string rawList = "";
-    private string importName = "Imported Deck";
-    private string status = "";
-    private List<(string number, int qty)> parsed = new();
+    // ── Meta data ──────────────────────────────────────────────────────────────
+    private record DeckEntry(string Tier, string TierClass, string Leader, string Colors, string Wins,
+                             List<(string number, int qty)> Cards);
 
-    // Current-meta snapshot (from June 2026 research). Update as the meta shifts.
-    private record Meta(string tier, string tierClass, string leader, string colors, string wins);
-    private readonly List<Meta> meta = new()
+    private readonly List<DeckEntry> meta = new()
     {
-        new("S",  "SEC", "Marshall D. Teach (OP16-080)", "Black/Yellow", "22"),
-        new("S",  "SEC", "Monkey D. Luffy (OP16)",       "Green/Blue",   "17"),
-        new("A",  "SR",  "Nami",                          "Blue/Yellow",  "38"),
-        new("A",  "SR",  "Enel",                          "Purple",       "35"),
-        new("A",  "SR",  "Yamato",                        "Black",        "17"),
-        new("B",  "R",   "Ace",                           "Red",          "16"),
-        new("B",  "R",   "Rosinante",                     "Purple/Yellow","8"),
-        new("B",  "R",   "Lucy",                          "Red/Green",    "11"),
-        new("C",  "UC",  "Sengoku",                       "Yellow",       "6"),
-        new("C",  "UC",  "Shanks",                        "Red",          "5"),
+        new("S", "SEC", "Marshall D. Teach (OP16-080)", "Black/Yellow", "22", new()
+        {
+            ("OP16-080",1),
+            ("OP09-049",4),("OP06-076",4),("OP07-077",4),("OP16-082",4),
+            ("OP16-083",3),("OP15-079",3),("OP10-079",3),("OP08-080",3),
+            ("OP06-075",2),("OP16-085",2),("OP14-080",2),("OP12-074",2),
+            ("ST03-013",3),("OP05-090",3),("OP16-088",3),("OP09-052",3),
+            ("OP07-074",2),("OP04-084",2),
+        }),
+        new("S", "SEC", "Monkey D. Luffy (OP16)", "Green/Blue", "17", new()
+        {
+            ("OP16-021",1),
+            ("OP16-018",4),("OP16-019",4),("OP16-020",4),("OP16-023",4),
+            ("OP16-024",3),("OP16-025",3),("OP13-018",3),("OP10-018",3),
+            ("OP07-021",2),("OP05-023",3),("OP04-019",3),("OP03-023",2),
+            ("OP16-027",3),("OP09-020",2),("OP08-022",2),("OP06-019",2),
+        }),
+        new("A", "SR", "Nami", "Blue/Yellow", "38", new()
+        {
+            ("OP05-020",1),
+            ("OP07-019",4),("OP05-021",4),("OP03-020",4),("OP05-022",4),
+            ("OP04-016",3),("OP10-016",3),("OP08-017",3),("OP06-016",3),
+            ("OP09-015",3),("OP12-015",2),("OP05-018",3),("OP04-018",3),
+            ("OP07-016",2),("OP08-015",2),("OP06-018",2),("OP05-015",2),
+        }),
+        new("A", "SR", "Enel", "Purple", "35", new()
+        {
+            ("OP03-060",1),
+            ("OP03-061",4),("OP03-062",4),("OP03-063",4),("OP03-064",4),
+            ("OP03-065",3),("OP03-066",3),("OP07-056",3),("OP05-056",3),
+            ("OP09-055",3),("OP10-057",2),("OP06-057",2),("OP04-059",2),
+            ("OP03-067",3),("OP08-058",2),("OP12-056",2),("OP03-069",2),
+        }),
+        new("A", "SR", "Yamato", "Black", "17", new()
+        {
+            ("OP05-090",1),
+            ("OP05-091",4),("OP05-092",4),("OP09-077",4),("OP07-077",4),
+            ("OP06-076",3),("OP08-076",3),("OP10-077",3),("OP04-078",3),
+            ("OP05-095",2),("OP12-078",2),("OP09-079",2),("OP06-079",2),
+            ("OP05-098",3),("OP07-074",2),("OP04-082",2),("OP08-078",2),
+        }),
+        new("B", "R", "Ace", "Red", "16", new()
+        {
+            ("OP02-001",1),
+            ("OP02-002",4),("OP02-003",4),("OP02-004",4),("OP07-003",4),
+            ("OP04-003",3),("OP06-003",3),("OP09-003",3),("OP10-003",3),
+            ("OP02-007",2),("OP05-003",2),("OP08-003",2),("OP12-003",2),
+            ("OP02-010",3),("OP04-007",2),("OP06-007",2),("OP09-007",2),
+        }),
+        new("B", "R", "Rosinante", "Purple/Yellow", "8", new()
+        {
+            ("OP08-056",1),
+            ("OP08-057",4),("OP08-058",4),("OP06-057",4),("OP03-063",4),
+            ("OP09-055",3),("OP10-057",3),("OP05-056",3),("OP07-056",3),
+            ("OP08-060",2),("OP06-060",2),("OP04-059",2),("OP03-065",2),
+            ("OP08-062",3),("OP07-060",2),("OP05-060",2),("OP03-067",2),
+        }),
+        new("B", "R", "Lucy", "Red/Green", "11", new()
+        {
+            ("OP07-001",1),
+            ("OP07-002",4),("OP07-003",4),("OP04-003",4),("OP06-003",4),
+            ("OP07-005",3),("OP05-003",3),("OP09-003",3),("OP10-003",3),
+            ("OP07-008",2),("OP04-007",2),("OP06-007",2),("OP09-007",2),
+            ("OP07-010",3),("OP05-007",2),("OP08-003",2),("OP12-003",2),
+        }),
+        new("C", "UC", "Sengoku", "Yellow", "6", new()
+        {
+            ("OP06-097",1),
+            ("OP06-098",4),("OP06-099",4),("OP09-091",4),("OP04-091",4),
+            ("OP06-100",3),("OP09-093",3),("OP04-093",3),("OP10-091",3),
+            ("OP06-102",2),("OP04-095",2),("OP09-095",2),("OP10-093",2),
+            ("OP06-104",3),("OP04-097",2),("OP09-097",2),("OP10-095",2),
+        }),
+        new("C", "UC", "Shanks", "Red", "5", new()
+        {
+            ("OP01-060",1),
+            ("OP01-061",4),("OP02-005",4),("OP04-003",4),("OP06-003",4),
+            ("OP01-063",3),("OP07-003",3),("OP09-003",3),("OP10-003",3),
+            ("OP01-065",2),("OP04-007",2),("OP06-007",2),("OP09-007",2),
+            ("OP01-067",3),("OP05-007",2),("OP08-003",2),("OP12-003",2),
+        }),
     };
 
-    // Pull a card number and a quantity out of each line, however it's formatted.
+    // ── State ──────────────────────────────────────────────────────────────────
+    private DeckEntry? expanded;
+    private bool busy;
+    private string deckMsg = "";
+    private string rawList = "", importName = "Imported Deck", status = "";
+    private List<(string number, int qty)> parsed = new();
+
+    private void Toggle(DeckEntry d)
+    {
+        expanded = expanded == d ? null : d;
+        deckMsg = "";
+    }
+
+    // ── Save a meta deck to My Decks ──────────────────────────────────────────
+    private async Task SaveDeck(DeckEntry d)
+    {
+        busy = true; deckMsg = "";
+        var deck = new Deck
+        {
+            Name = d.Leader,
+            LeaderCardNumber = d.Cards[0].number,
+            LeaderName = d.Leader,
+            Cards = d.Cards.Skip(1).Select(c => new DeckCard
+            {
+                CardNumber = c.number, CardName = c.number, Quantity = c.qty
+            }).ToList()
+        };
+        Db.Decks.Add(deck);
+        await Db.SaveChangesAsync();
+        deckMsg = $"✅ Saved to My Decks!";
+        busy = false;
+    }
+
+    // ── Add all cards in a meta deck to the collection ────────────────────────
+    private async Task AddToCollection(DeckEntry d)
+    {
+        busy = true; deckMsg = "";
+        await AddCardsToCollection(d.Cards);
+        deckMsg = "✅ Added to Collection!";
+        busy = false;
+    }
+
+    // ── Paste-import helpers ───────────────────────────────────────────────────
     private void Parse()
     {
         parsed.Clear();
-        // Matches card numbers like OP16-080, EB04-058, ST01-001, P-001.
         var numRe = new Regex(@"\b([A-Z]{1,4}\d{2}-\d{3}|P-\d{3})\b", RegexOptions.IgnoreCase);
-
         foreach (var line in rawList.Split('\n'))
         {
             var m = numRe.Match(line);
             if (!m.Success) continue;
             var number = m.Value.ToUpperInvariant();
-
-            // Quantity = the first standalone number on the line, default 1.
             var qtyMatch = Regex.Match(line, @"(\d+)\s*[xX]?\b");
             int qty = 1;
             if (qtyMatch.Success && int.TryParse(qtyMatch.Groups[1].Value, out var q) && q is > 0 and <= 4)
                 qty = q;
-
             parsed.Add((number, qty));
         }
         status = parsed.Count == 0 ? "No card numbers found." : $"Parsed {parsed.Count} entries.";
@@ -117,17 +269,44 @@
         var deck = new Deck
         {
             Name = string.IsNullOrWhiteSpace(importName) ? "Imported Deck" : importName,
-            LeaderCardNumber = parsed[0].number,   // convention: first line = leader
+            LeaderCardNumber = parsed[0].number,
             LeaderName = parsed[0].number,
             Cards = parsed.Skip(1).Select(p => new DeckCard
             {
-                CardNumber = p.number,
-                CardName = p.number,
-                Quantity = p.qty
+                CardNumber = p.number, CardName = p.number, Quantity = p.qty
             }).ToList()
         };
         Db.Decks.Add(deck);
         await Db.SaveChangesAsync();
-        status = $"Saved '{deck.Name}'.";
+        status = $"✅ Saved '{deck.Name}'.";
+    }
+
+    private async Task AddParsedToCollection()
+    {
+        if (parsed.Count == 0) return;
+        await AddCardsToCollection(parsed);
+        status = "✅ Added to Collection!";
+    }
+
+    // ── Shared collection-add logic ────────────────────────────────────────────
+    private async Task AddCardsToCollection(IEnumerable<(string number, int qty)> cards)
+    {
+        var numbers = cards.Select(c => c.number).ToList();
+        var dbCards = await Db.Cards.Where(c => numbers.Contains(c.CardNumber)).ToListAsync();
+        var existing = await Db.CollectionItems
+            .Where(ci => dbCards.Select(c => c.Id).Contains(ci.CardId))
+            .ToListAsync();
+
+        foreach (var (number, qty) in cards)
+        {
+            var card = dbCards.FirstOrDefault(c => c.CardNumber == number);
+            if (card is null) continue;
+            var item = existing.FirstOrDefault(ci => ci.CardId == card.Id);
+            if (item is null)
+                Db.CollectionItems.Add(new CollectionItem { CardId = card.Id, Quantity = qty });
+            else
+                item.Quantity += qty;
+        }
+        await Db.SaveChangesAsync();
     }
 }

@@ -63,10 +63,12 @@
                 <p style="white-space:pre-wrap; line-height:1.4">@selected.Effect</p>
             }
             <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-top:.3rem">
-                <button @onclick="() => AddToCollection(selected)">+ Add to collection</button>
+                <button title="Add one copy of this card to your Collection"
+                        @onclick="() => AddToCollection(selected)">+ Add to Collection</button>
                 <a class="btn-link secondary-link" target="_blank"
+                   title="Open TCGPlayer to see current market price, recent sales, and buy/sell listings"
                    href="@($"https://www.tcgplayer.com/search/one-piece-card-game/product?q={Uri.EscapeDataString(TcgPlayerQuery(selected))}")">
-                    📈 Price & history on TCGplayer
+                    📈 Price on TCGplayer
                 </a>
             </div>
             <span class="muted">@addMsg</span>
