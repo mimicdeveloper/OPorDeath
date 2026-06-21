@@ -52,41 +52,20 @@
                         </div>
 
                         <!-- DON!! deck -->
-                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .4rem; text-transform:uppercase; letter-spacing:1px">
-                            DON!! Deck (×10) — <span style="color:var(--gold)">choose your style</span>
-                        </p>
-                        @{ var activeDon = DonStyles.First(s => s.Id == GetDonStyle(d.LeaderNumber)); }
-                        <!-- Style picker -->
-                        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:.6rem">
-                            @foreach (var ds in DonStyles)
-                            {
-                                var isActive = ds.Id == GetDonStyle(d.LeaderNumber);
-                                <button @onclick="() => SetDonStyle(d.LeaderNumber, ds.Id)"
-                                        title="Use @ds.Label DON!! card art"
-                                        style="border:2px solid @(isActive ? "var(--gold)" : "#2c2230");
-                                               background:@ds.Gradient; color:@ds.Text;
-                                               border-radius:6px; padding:3px 10px; font-size:.7rem;
-                                               font-weight:@(isActive ? "700" : "400"); cursor:pointer; transition:.15s">
-                                    @ds.Label@(isActive ? " ✓" : "")
-                                </button>
-                            }
-                        </div>
-                        <!-- 10 DON!! cards -->
+                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .4rem; text-transform:uppercase; letter-spacing:1px">DON!! Deck (×10)</p>
                         <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:.8rem">
                             @for (int i = 0; i < 10; i++)
                             {
                                 <div style="width:70px; height:98px; flex-shrink:0; border-radius:6px;
-                                            background:@activeDon.Gradient;
-                                            border:2px solid @activeDon.Shadow;
+                                            background:linear-gradient(135deg,#4a3800,#c09000,#e9b84c,#c09000,#4a3800);
+                                            border:2px solid #e9b84c;
                                             display:flex; flex-direction:column; align-items:center;
                                             justify-content:center; gap:4px; position:relative; overflow:hidden">
-                                    <!-- inner glow ring -->
                                     <div style="position:absolute; inset:4px; border-radius:4px;
-                                                border:1px solid rgba(255,255,255,.12)"></div>
-                                    <span style="font-size:1.4rem; line-height:1">⚡</span>
-                                    <span style="font-size:.55rem; font-weight:900; letter-spacing:2px;
-                                                 color:@activeDon.Text; text-shadow:0 1px 4px rgba(0,0,0,.8)">DON!!</span>
-                                    <span style="font-size:.45rem; color:rgba(255,255,255,.5)">@activeDon.Label</span>
+                                                border:1px solid rgba(255,220,80,.4)"></div>
+                                    <span style="font-size:1.5rem; line-height:1; filter:drop-shadow(0 0 6px #ffcc00)">⚡</span>
+                                    <span style="font-size:.6rem; font-weight:900; letter-spacing:2px;
+                                                 color:#fff; text-shadow:0 0 8px #ffcc00, 0 1px 3px rgba(0,0,0,.9)">DON!!</span>
                                 </div>
                             }
                         </div>
@@ -226,27 +205,6 @@
     private string deckMsg = "";
     private string rawList = "", importName = "Imported Deck", status = "";
     private List<(string number, int qty)> parsed = new();
-
-    private record DonStyle(string Id, string Label, string Gradient, string Text, string Shadow);
-
-    private static readonly List<DonStyle> DonStyles = new()
-    {
-        new("red",    "Red (ST01)",          "linear-gradient(135deg,#6b0000,#c01826)", "#fff",    "#c01826"),
-        new("blue",   "Blue (ST02)",          "linear-gradient(135deg,#00306b,#1060c0)", "#fff",    "#3080e0"),
-        new("green",  "Green (ST03)",         "linear-gradient(135deg,#004020,#1a8040)", "#fff",    "#40b060"),
-        new("yellow", "Yellow (ST04)",        "linear-gradient(135deg,#6b5000,#c09000)", "#fff",    "#e9b84c"),
-        new("purple", "Purple (ST07)",        "linear-gradient(135deg,#3a006b,#7020c0)", "#fff",    "#9050e0"),
-        new("black",  "Black (ST08)",         "linear-gradient(135deg,#0a0a0a,#1e1e2e)", "#e9b84c","#555"),
-        new("multi",  "Multi-color (ST10+)",  "linear-gradient(135deg,#6b0000,#004020)", "#fff",    "#40b060"),
-    };
-
-    private readonly Dictionary<string, string> selectedDonStyle = new();
-
-    private string GetDonStyle(string leaderNumber) =>
-        selectedDonStyle.TryGetValue(leaderNumber, out var v) ? v : "red";
-
-    private void SetDonStyle(string leaderNumber, string styleId) =>
-        selectedDonStyle[leaderNumber] = styleId;
 
     private void Toggle(DeckEntry d) { expanded = expanded == d ? null : d; deckMsg = ""; }
 
