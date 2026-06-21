@@ -1,0 +1,93 @@
+@page "/register"
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Identity.UI.Services
+@inject UserManager<IdentityUser> UserMgr
+@inject SignInManager<IdentityUser> SignIn
+@inject IEmailSender EmailSender
+@inject NavigationManager Nav
+
+<h1>📝 Register</h1>
+
+<div class="panel" style="max-width:420px">
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <p style="color:#ff6b6b">@error</p>
+    }
+    @if (sent)
+    {
+        <p style="color:#6bff9e">
+            ✅ Account created! A confirmation link has been sent to <strong>@email</strong>.
+            Check your inbox and click the link to activate your account, then <a href="/login">log in</a>.
+        </p>
+    }
+    else
+    {
+        <div style="display:flex; flex-direction:column; gap:.8rem">
+            <div>
+                <label class="muted" style="font-size:.85rem">Username</label>
+                <input @bind="username" placeholder="Choose a username" style="width:100%; margin-top:.25rem" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem">Email</label>
+                <input type="email" @bind="email" placeholder="your@email.com" style="width:100%; margin-top:.25rem" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem">Password</label>
+                <input type="password" @bind="password" placeholder="Min 8 chars, include a symbol" style="width:100%; margin-top:.25rem" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem">Confirm Password</label>
+                <input type="password" @bind="confirm" placeholder="Repeat password" style="width:100%; margin-top:.25rem"
+                       @onkeydown="@(async e => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+            <button @onclick="DoRegister" disabled="@busy">@(busy ? "Creating account…" : "Create Account")</button>
+            <p class="muted" style="font-size:.85rem; margin:0">
+                Already have an account? <a href="/login">Login here</a>
+            </p>
+        </div>
+    }
+</div>
+
+@code {
+    private string username = "", email = "", password = "", confirm = "", error = "";
+    private bool busy, sent;
+
+    private async Task DoRegister()
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirm))
+        {
+            error = "Please fill in all fields.";
+            return;
+        }
+        if (password != confirm)
+        {
+            error = "Passwords do not match.";
+            return;
+        }
+
+        busy = true;
+        var user = new IdentityUser { UserName = username, Email = email };
+        var result = await UserMgr.CreateAsync(user, password);
+
+        if (!result.Succeeded)
+        {
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+            busy = false;
+            return;
+        }
+
+        // Send confirmation email
+        var token = await UserMgr.GenerateEmailConfirmationTokenAsync(user);
+        var link = Nav.ToAbsoluteUri($"/confirm-email?userId={Uri.EscapeDataString(user.Id)}&token={Uri.EscapeDataString(token)}");
+        await EmailSender.SendEmailAsync(email, "Confirm your OP or Death account",
+            $"<p>Welcome to <strong>OP or Death</strong> ☠</p>" +
+            $"<p>Click the link below to confirm your email and activate your account:</p>" +
+            $"<p><a href='{link}'>Confirm Email</a></p>" +
+            $"<p class='muted' style='font-size:.85rem'>If you didn't register, ignore this email.</p>");
+
+        sent = true;
+        busy = false;
+    }
+}

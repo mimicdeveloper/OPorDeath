@@ -22,15 +22,15 @@
     <div class="nav-divider">Account</div>
     <AuthorizeView>
         <Authorized Context="authContext">
-            <NavLink class="nav-item" href="Identity/Account/Manage">👤 @authContext.User.Identity?.Name</NavLink>
+            <span class="nav-item" style="cursor:default">👤 @authContext.User.Identity?.Name</span>
             <form method="post" action="/account/logout" style="margin:0">
                 <AntiforgeryToken />
                 <button type="submit" class="nav-logout">🚪 Logout</button>
             </form>
         </Authorized>
         <NotAuthorized>
-            <NavLink class="nav-item" href="Identity/Account/Login">🔑 Login</NavLink>
-            <NavLink class="nav-item" href="Identity/Account/Register">📝 Register</NavLink>
+            <NavLink class="nav-item" href="login">🔑 Login</NavLink>
+            <NavLink class="nav-item" href="register">📝 Register</NavLink>
         </NotAuthorized>
     </AuthorizeView>
 

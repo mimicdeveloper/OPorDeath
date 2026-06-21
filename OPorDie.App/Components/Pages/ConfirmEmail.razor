@@ -1,0 +1,55 @@
+@page "/confirm-email"
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<IdentityUser> UserMgr
+@inject NavigationManager Nav
+
+<h1>✉️ Confirm Email</h1>
+
+<div class="panel" style="max-width:420px">
+    @if (loading)
+    {
+        <p class="muted">Confirming your email…</p>
+    }
+    else if (success)
+    {
+        <p style="color:#6bff9e">✅ Email confirmed! You can now <a href="/login">log in</a>.</p>
+    }
+    else
+    {
+        <p style="color:#ff6b6b">@error</p>
+        <p class="muted">Try registering again or contact support.</p>
+    }
+</div>
+
+@code {
+    private bool loading = true, success;
+    private string error = "";
+
+    [SupplyParameterFromQuery] private string? userId { get; set; }
+    [SupplyParameterFromQuery] private string? token { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+        {
+            error = "Invalid confirmation link.";
+            loading = false;
+            return;
+        }
+
+        var user = await UserMgr.FindByIdAsync(userId);
+        if (user is null)
+        {
+            error = "Account not found.";
+            loading = false;
+            return;
+        }
+
+        var result = await UserMgr.ConfirmEmailAsync(user, token);
+        success = result.Succeeded;
+        if (!success)
+            error = "Confirmation failed — the link may have expired. Please register again.";
+
+        loading = false;
+    }
+}

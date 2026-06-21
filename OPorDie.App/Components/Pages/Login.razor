@@ -1,0 +1,78 @@
+@page "/login"
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignIn
+@inject UserManager<IdentityUser> UserMgr
+@inject NavigationManager Nav
+
+<h1>🔑 Login</h1>
+
+<div class="panel" style="max-width:420px">
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <p style="color:#ff6b6b">@error</p>
+    }
+    <div style="display:flex; flex-direction:column; gap:.8rem">
+        <div>
+            <label class="muted" style="font-size:.85rem">Username or Email</label>
+            <input @bind="input" placeholder="Username or email" style="width:100%; margin-top:.25rem" />
+        </div>
+        <div>
+            <label class="muted" style="font-size:.85rem">Password</label>
+            <input type="password" @bind="password" placeholder="Password" style="width:100%; margin-top:.25rem"
+                   @onkeydown="@(async e => { if (e.Key == "Enter") await DoLogin(); })" />
+        </div>
+        <button @onclick="DoLogin" disabled="@busy">@(busy ? "Logging in…" : "Login")</button>
+        <p class="muted" style="font-size:.85rem; margin:0">
+            No account? <a href="/register">Register here</a> &nbsp;·&nbsp; <a href="/forgot-password">Forgot password?</a>
+        </p>
+    </div>
+</div>
+
+@code {
+    private string input = "", password = "", error = "";
+    private bool busy;
+
+    private async Task DoLogin()
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(password))
+        {
+            error = "Please fill in all fields.";
+            return;
+        }
+
+        busy = true;
+        // Support login by email or username
+        var user = input.Contains('@')
+            ? await UserMgr.FindByEmailAsync(input)
+            : await UserMgr.FindByNameAsync(input);
+
+        if (user is null)
+        {
+            error = "No account found with that username or email.";
+            busy = false;
+            return;
+        }
+
+        var result = await SignIn.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: true);
+
+        if (result.Succeeded)
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        else if (result.IsLockedOut)
+        {
+            error = "Account locked after too many failed attempts. Try again later.";
+        }
+        else if (result.IsNotAllowed)
+        {
+            error = "Please confirm your email before logging in. Check your inbox.";
+        }
+        else
+        {
+            error = "Incorrect password.";
+        }
+
+        busy = false;
+    }
+}

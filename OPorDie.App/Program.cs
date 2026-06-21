@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
-using OPorDie.Components;   // the Blazor UI (App.razor lives here)
+using OPorDie.Components;
 using OPorDie.Data;
 using OPorDie.Models;
 using OPorDie.Services;
@@ -52,14 +53,16 @@ builder.Services.AddDbContext<UsersDbContext>(options =>
 // built-in Login/Register/Manage/Forgot-password pages (under /Identity/Account/*).
 builder.Services.AddDefaultIdentity<IdentityUser>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = false; // no email step for now
-        options.Password.RequiredLength = 8;            // stronger minimum
+        options.SignIn.RequireConfirmedAccount = true;
+        options.Password.RequiredLength = 8;
         options.Password.RequireNonAlphanumeric = true;
-        options.Lockout.MaxFailedAccessAttempts = 5;    // brute-force protection
+        options.Lockout.MaxFailedAccessAttempts = 5;
     })
     .AddEntityFrameworkStores<UsersDbContext>();
 
-builder.Services.AddRazorPages(); // serves the Identity account pages
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
+
+builder.Services.AddRazorPages();
 
 // --- Blazor: register the UI engine ---
 // AddRazorComponents turns on Blazor. AddInteractiveServerComponents means
