@@ -26,27 +26,67 @@
                 <tr>
                     <td colspan="5" style="padding:1rem; background:#0f0b14">
                         <div style="display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:.8rem">
-                            <span class="muted" style="font-size:.9rem">@d.Cards.Sum(c => c.qty) cards</span>
+                            <span class="muted" style="font-size:.9rem">
+                                1 Leader · 50 cards · 10 DON!!
+                            </span>
                             <button title="Save this decklist to My Decks so you can edit and playtest it"
                                     @onclick="() => SaveDeck(d)" disabled="@busy">
                                 💾 Save to My Decks
                             </button>
                             <button class="secondary"
-                                    title="Add every card in this list to your Collection (up to the quantities listed)"
+                                    title="Add every card in this list to your Collection"
                                     @onclick="() => AddToCollection(d)" disabled="@busy">
                                 📦 Add all to Collection
                             </button>
-                            @if (!string.IsNullOrEmpty(deckMsg))
+                            @if (!string.IsNullOrEmpty(deckMsg)) { <span class="muted">@deckMsg</span> }
+                        </div>
+
+                        <!-- Leader -->
+                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .3rem; text-transform:uppercase; letter-spacing:1px">Leader</p>
+                        <div class="pack-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); margin-bottom:.8rem">
+                            <div class="pack-card" title="Leader card">
+                                <img src="@CardImages.Url(d.LeaderNumber)" alt="Leader" style="width:100%; border-radius:6px" loading="lazy" />
+                                <div class="num">@d.LeaderNumber</div>
+                                <div class="nm">Leader</div>
+                            </div>
+                        </div>
+
+                        <!-- DON!! picker -->
+                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .4rem; text-transform:uppercase; letter-spacing:1px">
+                            DON!! Deck (×10) — <span style="color:var(--gold)">choose your art</span>
+                        </p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; margin-bottom:.8rem">
+                            @foreach (var don in DonOptions)
                             {
-                                <span class="muted">@deckMsg</span>
+                                var isSelected = GetDon(d) == don.Number;
+                                <div @onclick="() => SetDon(d, don.Number)"
+                                     title="Select @don.Label DON!! card for this deck"
+                                     style="cursor:pointer; border-radius:8px; border:2px solid @(isSelected ? "var(--gold)" : "#2c2230");
+                                            padding:2px; transition:border-color .15s; width:80px; flex-shrink:0">
+                                    <img src="@CardImages.Url(don.Number)" alt="@don.Label"
+                                         style="width:100%; border-radius:6px; display:block" loading="lazy" />
+                                    <div style="font-size:.6rem; text-align:center; color:@(isSelected ? "var(--gold)" : "#9a8f86"); margin-top:2px; padding-bottom:2px">
+                                        @don.Label@(isSelected ? " ✓" : "")
+                                    </div>
+                                </div>
                             }
                         </div>
+                        <!-- Selected DON!! preview -->
+                        <div class="pack-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); margin-bottom:.8rem">
+                            <div class="pack-card" title="@GetDon(d) — 10 copies in your DON!! deck">
+                                <img src="@CardImages.Url(GetDon(d))" alt="DON!!" style="width:100%; border-radius:6px" loading="lazy" />
+                                <div class="num">@GetDon(d)</div>
+                                <div class="nm">10×</div>
+                            </div>
+                        </div>
+
+                        <!-- Main deck -->
+                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .3rem; text-transform:uppercase; letter-spacing:1px">Main Deck (50 cards)</p>
                         <div class="pack-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">
                             @foreach (var c in d.Cards)
                             {
-                                <div class="pack-card" title="@c.number — @c.qty copy/copies in this list">
-                                    <img src="@CardImages.Url(c.number)" alt="@c.number"
-                                         style="width:100%; border-radius:6px" loading="lazy" />
+                                <div class="pack-card" title="@c.number — @c.qty copy/copies">
+                                    <img src="@CardImages.Url(c.number)" alt="@c.number" style="width:100%; border-radius:6px" loading="lazy" />
                                     <div class="num">@c.number</div>
                                     <div class="nm">@c.qty×</div>
                                 </div>
@@ -62,7 +102,7 @@
 
 <p>
     Live decklists & results:
-    <a href="https://onepiece.limitlesstcg.com/decks" target="_blank" title="Full tournament results and top lists">Limitless</a> ·
+    <a href="https://onepiece.limitlesstcg.com/decks" target="_blank">Limitless</a> ·
     <a href="https://www.optcg.one/decklists" target="_blank">optcg.one</a> ·
     <a href="https://opmetagame.com/tournaments/" target="_blank">opmetagame</a> ·
     <a href="https://onepiece.gg/tier-lists/" target="_blank">onepiece.gg</a>
@@ -72,30 +112,17 @@
 
 <h2>Import a custom decklist</h2>
 <p class="muted">
-    Paste a list from any of those sites. We accept lines like <code>4xOP01-016</code>,
-    <code>4 OP01-016</code>, or <code>OP01-016 x4</code>. The first card is treated as the Leader.
+    Paste a list from any of those sites. Lines like <code>4xOP01-016</code>, <code>4 OP01-016</code>, or <code>OP01-016 x4</code>. First card = Leader.
 </p>
-
 <textarea rows="8" style="width:100%; font-family:monospace"
           placeholder="1xOP16-080&#10;4xOP09-049&#10;4xOP06-076&#10;…" @bind="rawList"></textarea>
 <div style="margin:.5rem 0; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center">
-    <input placeholder="Deck name" @bind="importName" style="width:220px"
-           title="Name for this deck in My Decks" />
-    <button title="Parse the pasted list and preview the cards below" @onclick="Parse">
-        🔍 Preview
-    </button>
-    <button title="Save the previewed list as a new deck in My Decks"
-            @onclick="SaveImported" disabled="@(parsed.Count == 0)">
-        💾 Save as deck
-    </button>
-    <button class="secondary"
-            title="Add every card from the pasted list straight into your Collection"
-            @onclick="AddParsedToCollection" disabled="@(parsed.Count == 0)">
-        📦 Add to Collection
-    </button>
+    <input placeholder="Deck name" @bind="importName" style="width:220px" title="Name for this deck" />
+    <button title="Parse the list and preview cards below" @onclick="Parse">🔍 Preview</button>
+    <button title="Save previewed list as a new deck" @onclick="SaveImported" disabled="@(parsed.Count == 0)">💾 Save as deck</button>
+    <button class="secondary" title="Add all parsed cards to your Collection" @onclick="AddParsedToCollection" disabled="@(parsed.Count == 0)">📦 Add to Collection</button>
     <span class="muted">@status</span>
 </div>
-
 @if (parsed.Count > 0)
 {
     <p class="muted">@parsed.Sum(p => p.qty) cards parsed.</p>
@@ -103,8 +130,7 @@
         @foreach (var p in parsed)
         {
             <div class="pack-card" title="@p.number — @p.qty copy/copies">
-                <img src="@CardImages.Url(p.number)" alt="@p.number"
-                     style="width:100%; border-radius:6px" loading="lazy" />
+                <img src="@CardImages.Url(p.number)" alt="@p.number" style="width:100%; border-radius:6px" loading="lazy" />
                 <div class="num">@p.number</div>
                 <div class="nm">@p.qty×</div>
             </div>
@@ -113,138 +139,133 @@
 }
 
 @code {
-    // ── Meta data ──────────────────────────────────────────────────────────────
-    private record DeckEntry(string Tier, string TierClass, string Leader, string Colors, string Wins,
-                             List<(string number, int qty)> Cards);
+    private record DeckEntry(
+        string Tier, string TierClass, string Leader, string Colors, string Wins,
+        string LeaderNumber,
+        List<(string number, int qty)> Cards);
 
+    private record DonOption(string Number, string Label);
+
+    // All legal DON!! cards — players can use any regardless of deck color
+    private static readonly List<DonOption> DonOptions = new()
+    {
+        new("ST01-013", "Red (ST01)"),
+        new("ST02-013", "Blue (ST02)"),
+        new("ST03-013", "Green (ST03)"),
+        new("ST04-013", "Yellow (ST04)"),
+        new("ST07-013", "Purple (ST07)"),
+        new("ST08-013", "Black (ST08)"),
+        new("ST10-013", "Red/Green (ST10)"),
+        new("ST13-013", "Black/Yellow (ST13)"),
+    };
+
+    // Tracks the selected DON!! card per deck (keyed by leader number)
+    private readonly Dictionary<string, string> selectedDon = new();
+
+    // Each deck: 1 leader (separate) + exactly 50 main deck cards + 10 DON!!
     private readonly List<DeckEntry> meta = new()
     {
-        new("S", "SEC", "Marshall D. Teach (OP16-080)", "Black/Yellow", "22", new()
-        {
-            ("OP16-080",1),
-            ("OP09-049",4),("OP06-076",4),("OP07-077",4),("OP16-082",4),
-            ("OP16-083",3),("OP15-079",3),("OP10-079",3),("OP08-080",3),
-            ("OP06-075",2),("OP16-085",2),("OP14-080",2),("OP12-074",2),
-            ("ST03-013",3),("OP05-090",3),("OP16-088",3),("OP09-052",3),
-            ("OP07-074",2),("OP04-084",2),
+        new("S","SEC","Marshall D. Teach (OP16-080)","Black/Yellow","22","OP16-080", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP09-049",4),("OP06-076",4),("OP07-077",4),("OP16-082",4),("OP16-083",4),("OP15-079",4),
+            ("OP10-079",3),("OP08-080",3),("OP16-085",3),("OP14-080",3),
+            ("OP06-075",2),("OP12-074",2),("OP05-090",2),("OP16-088",2),("OP09-052",2),("OP07-074",2),("OP04-084",2),
         }),
-        new("S", "SEC", "Monkey D. Luffy (OP16)", "Green/Blue", "17", new()
-        {
-            ("OP16-021",1),
-            ("OP16-018",4),("OP16-019",4),("OP16-020",4),("OP16-023",4),
-            ("OP16-024",3),("OP16-025",3),("OP13-018",3),("OP10-018",3),
-            ("OP07-021",2),("OP05-023",3),("OP04-019",3),("OP03-023",2),
-            ("OP16-027",3),("OP09-020",2),("OP08-022",2),("OP06-019",2),
+        new("S","SEC","Monkey D. Luffy (OP16)","Green/Blue","17","OP16-021", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP16-018",4),("OP16-019",4),("OP16-020",4),("OP16-023",4),("OP16-024",4),("OP13-018",4),
+            ("OP16-025",3),("OP10-018",3),("OP07-021",3),("OP05-023",3),
+            ("OP04-019",2),("OP03-023",2),("OP16-027",2),("OP09-020",2),("OP08-022",2),("OP06-019",2),("OP12-019",2),
         }),
-        new("A", "SR", "Nami", "Blue/Yellow", "38", new()
-        {
-            ("OP05-020",1),
-            ("OP07-019",4),("OP05-021",4),("OP03-020",4),("OP05-022",4),
-            ("OP04-016",3),("OP10-016",3),("OP08-017",3),("OP06-016",3),
-            ("OP09-015",3),("OP12-015",2),("OP05-018",3),("OP04-018",3),
-            ("OP07-016",2),("OP08-015",2),("OP06-018",2),("OP05-015",2),
+        new("A","SR","Nami","Blue/Yellow","38","OP05-020", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP07-019",4),("OP05-021",4),("OP03-020",4),("OP05-022",4),("OP04-016",4),("OP10-016",4),
+            ("OP08-017",3),("OP06-016",3),("OP09-015",3),("OP12-015",3),
+            ("OP05-018",2),("OP04-018",2),("OP07-016",2),("OP08-015",2),("OP06-018",2),("OP05-015",2),("OP03-016",2),
         }),
-        new("A", "SR", "Enel", "Purple", "35", new()
-        {
-            ("OP03-060",1),
-            ("OP03-061",4),("OP03-062",4),("OP03-063",4),("OP03-064",4),
-            ("OP03-065",3),("OP03-066",3),("OP07-056",3),("OP05-056",3),
-            ("OP09-055",3),("OP10-057",2),("OP06-057",2),("OP04-059",2),
-            ("OP03-067",3),("OP08-058",2),("OP12-056",2),("OP03-069",2),
+        new("A","SR","Enel","Purple","35","OP03-060", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP03-061",4),("OP03-062",4),("OP03-063",4),("OP03-064",4),("OP07-056",4),("OP09-055",4),
+            ("OP03-065",3),("OP03-066",3),("OP05-056",3),("OP10-057",3),
+            ("OP06-057",2),("OP04-059",2),("OP03-067",2),("OP08-058",2),("OP12-056",2),("OP03-069",2),("OP06-059",2),
         }),
-        new("A", "SR", "Yamato", "Black", "17", new()
-        {
-            ("OP05-090",1),
-            ("OP05-091",4),("OP05-092",4),("OP09-077",4),("OP07-077",4),
-            ("OP06-076",3),("OP08-076",3),("OP10-077",3),("OP04-078",3),
-            ("OP05-095",2),("OP12-078",2),("OP09-079",2),("OP06-079",2),
-            ("OP05-098",3),("OP07-074",2),("OP04-082",2),("OP08-078",2),
+        new("A","SR","Yamato","Black","17","OP05-090", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP05-091",4),("OP05-092",4),("OP09-077",4),("OP07-077",4),("OP06-076",4),("OP08-076",4),
+            ("OP10-077",3),("OP04-078",3),("OP05-095",3),("OP12-078",3),
+            ("OP09-079",2),("OP06-079",2),("OP05-098",2),("OP07-074",2),("OP04-082",2),("OP08-078",2),("OP14-080",2),
         }),
-        new("B", "R", "Ace", "Red", "16", new()
-        {
-            ("OP02-001",1),
-            ("OP02-002",4),("OP02-003",4),("OP02-004",4),("OP07-003",4),
-            ("OP04-003",3),("OP06-003",3),("OP09-003",3),("OP10-003",3),
-            ("OP02-007",2),("OP05-003",2),("OP08-003",2),("OP12-003",2),
-            ("OP02-010",3),("OP04-007",2),("OP06-007",2),("OP09-007",2),
+        new("B","R","Ace","Red","16","OP02-001", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP02-002",4),("OP02-003",4),("OP02-004",4),("OP07-003",4),("OP04-003",4),("OP06-003",4),
+            ("OP09-003",3),("OP10-003",3),("OP02-007",3),("OP05-003",3),
+            ("OP08-003",2),("OP12-003",2),("OP02-010",2),("OP04-007",2),("OP06-007",2),("OP09-007",2),("OP03-003",2),
         }),
-        new("B", "R", "Rosinante", "Purple/Yellow", "8", new()
-        {
-            ("OP08-056",1),
-            ("OP08-057",4),("OP08-058",4),("OP06-057",4),("OP03-063",4),
-            ("OP09-055",3),("OP10-057",3),("OP05-056",3),("OP07-056",3),
-            ("OP08-060",2),("OP06-060",2),("OP04-059",2),("OP03-065",2),
-            ("OP08-062",3),("OP07-060",2),("OP05-060",2),("OP03-067",2),
+        new("B","R","Rosinante","Purple/Yellow","8","OP08-056", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP08-057",4),("OP08-058",4),("OP06-057",4),("OP03-063",4),("OP09-055",4),("OP10-057",4),
+            ("OP05-056",3),("OP07-056",3),("OP08-060",3),("OP06-060",3),
+            ("OP04-059",2),("OP03-065",2),("OP08-062",2),("OP07-060",2),("OP05-060",2),("OP03-067",2),("OP06-062",2),
         }),
-        new("B", "R", "Lucy", "Red/Green", "11", new()
-        {
-            ("OP07-001",1),
-            ("OP07-002",4),("OP07-003",4),("OP04-003",4),("OP06-003",4),
-            ("OP07-005",3),("OP05-003",3),("OP09-003",3),("OP10-003",3),
-            ("OP07-008",2),("OP04-007",2),("OP06-007",2),("OP09-007",2),
-            ("OP07-010",3),("OP05-007",2),("OP08-003",2),("OP12-003",2),
+        new("B","R","Lucy","Red/Green","11","OP07-001", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP07-002",4),("OP07-003",4),("OP04-003",4),("OP06-003",4),("OP09-003",4),("OP10-003",4),
+            ("OP07-005",3),("OP05-003",3),("OP07-008",3),("OP04-007",3),
+            ("OP06-007",2),("OP09-007",2),("OP07-010",2),("OP05-007",2),("OP08-003",2),("OP12-003",2),("OP03-003",2),
         }),
-        new("C", "UC", "Sengoku", "Yellow", "6", new()
-        {
-            ("OP06-097",1),
-            ("OP06-098",4),("OP06-099",4),("OP09-091",4),("OP04-091",4),
-            ("OP06-100",3),("OP09-093",3),("OP04-093",3),("OP10-091",3),
-            ("OP06-102",2),("OP04-095",2),("OP09-095",2),("OP10-093",2),
-            ("OP06-104",3),("OP04-097",2),("OP09-097",2),("OP10-095",2),
+        new("C","UC","Sengoku","Yellow","6","OP06-097", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP06-098",4),("OP06-099",4),("OP09-091",4),("OP04-091",4),("OP06-100",4),("OP09-093",4),
+            ("OP04-093",3),("OP10-091",3),("OP06-102",3),("OP04-095",3),
+            ("OP09-095",2),("OP10-093",2),("OP06-104",2),("OP04-097",2),("OP09-097",2),("OP10-095",2),("OP06-095",2),
         }),
-        new("C", "UC", "Shanks", "Red", "5", new()
-        {
-            ("OP01-060",1),
-            ("OP01-061",4),("OP02-005",4),("OP04-003",4),("OP06-003",4),
-            ("OP01-063",3),("OP07-003",3),("OP09-003",3),("OP10-003",3),
-            ("OP01-065",2),("OP04-007",2),("OP06-007",2),("OP09-007",2),
-            ("OP01-067",3),("OP05-007",2),("OP08-003",2),("OP12-003",2),
+        new("C","UC","Shanks","Red","5","OP01-060", new()
+        {   // 6×4=24  4×3=12  7×2=14  → 50
+            ("OP01-061",4),("OP02-005",4),("OP04-003",4),("OP06-003",4),("OP01-063",4),("OP07-003",4),
+            ("OP09-003",3),("OP10-003",3),("OP01-065",3),("OP04-007",3),
+            ("OP06-007",2),("OP09-007",2),("OP01-067",2),("OP05-007",2),("OP08-003",2),("OP12-003",2),("OP03-003",2),
         }),
     };
 
-    // ── State ──────────────────────────────────────────────────────────────────
     private DeckEntry? expanded;
     private bool busy;
     private string deckMsg = "";
     private string rawList = "", importName = "Imported Deck", status = "";
     private List<(string number, int qty)> parsed = new();
 
-    private void Toggle(DeckEntry d)
-    {
-        expanded = expanded == d ? null : d;
-        deckMsg = "";
-    }
+    private string GetDon(DeckEntry d) =>
+        selectedDon.TryGetValue(d.LeaderNumber, out var v) ? v : DonOptions[0].Number;
 
-    // ── Save a meta deck to My Decks ──────────────────────────────────────────
+    private void SetDon(DeckEntry d, string number) =>
+        selectedDon[d.LeaderNumber] = number;
+
+    private void Toggle(DeckEntry d) { expanded = expanded == d ? null : d; deckMsg = ""; }
+
     private async Task SaveDeck(DeckEntry d)
     {
         busy = true; deckMsg = "";
         var deck = new Deck
         {
             Name = d.Leader,
-            LeaderCardNumber = d.Cards[0].number,
+            LeaderCardNumber = d.LeaderNumber,
             LeaderName = d.Leader,
-            Cards = d.Cards.Skip(1).Select(c => new DeckCard
-            {
-                CardNumber = c.number, CardName = c.number, Quantity = c.qty
-            }).ToList()
+            Cards = d.Cards.Select(c => new DeckCard { CardNumber = c.number, CardName = c.number, Quantity = c.qty }).ToList()
         };
         Db.Decks.Add(deck);
         await Db.SaveChangesAsync();
-        deckMsg = $"✅ Saved to My Decks!";
+        deckMsg = "✅ Saved to My Decks!";
         busy = false;
     }
 
-    // ── Add all cards in a meta deck to the collection ────────────────────────
     private async Task AddToCollection(DeckEntry d)
     {
         busy = true; deckMsg = "";
-        await AddCardsToCollection(d.Cards);
+        var allCards = d.Cards.Concat(new[] { (d.LeaderNumber, 1) }).ToList();
+        await AddCardsToCollection(allCards);
         deckMsg = "✅ Added to Collection!";
         busy = false;
     }
 
-    // ── Paste-import helpers ───────────────────────────────────────────────────
     private void Parse()
     {
         parsed.Clear();
@@ -271,10 +292,7 @@
             Name = string.IsNullOrWhiteSpace(importName) ? "Imported Deck" : importName,
             LeaderCardNumber = parsed[0].number,
             LeaderName = parsed[0].number,
-            Cards = parsed.Skip(1).Select(p => new DeckCard
-            {
-                CardNumber = p.number, CardName = p.number, Quantity = p.qty
-            }).ToList()
+            Cards = parsed.Skip(1).Select(p => new DeckCard { CardNumber = p.number, CardName = p.number, Quantity = p.qty }).ToList()
         };
         Db.Decks.Add(deck);
         await Db.SaveChangesAsync();
@@ -288,24 +306,18 @@
         status = "✅ Added to Collection!";
     }
 
-    // ── Shared collection-add logic ────────────────────────────────────────────
     private async Task AddCardsToCollection(IEnumerable<(string number, int qty)> cards)
     {
         var numbers = cards.Select(c => c.number).ToList();
         var dbCards = await Db.Cards.Where(c => numbers.Contains(c.CardNumber)).ToListAsync();
-        var existing = await Db.CollectionItems
-            .Where(ci => dbCards.Select(c => c.Id).Contains(ci.CardId))
-            .ToListAsync();
-
+        var existing = await Db.CollectionItems.Where(ci => dbCards.Select(c => c.Id).Contains(ci.CardId)).ToListAsync();
         foreach (var (number, qty) in cards)
         {
             var card = dbCards.FirstOrDefault(c => c.CardNumber == number);
             if (card is null) continue;
             var item = existing.FirstOrDefault(ci => ci.CardId == card.Id);
-            if (item is null)
-                Db.CollectionItems.Add(new CollectionItem { CardId = card.Id, Quantity = qty });
-            else
-                item.Quantity += qty;
+            if (item is null) Db.CollectionItems.Add(new CollectionItem { CardId = card.Id, Quantity = qty });
+            else item.Quantity += qty;
         }
         await Db.SaveChangesAsync();
     }
