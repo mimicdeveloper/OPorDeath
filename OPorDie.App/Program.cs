@@ -61,6 +61,7 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
     .AddEntityFrameworkStores<UsersDbContext>();
 
 builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<CodeStore>();
 
 builder.Services.AddRazorPages();
 

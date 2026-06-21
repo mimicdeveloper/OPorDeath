@@ -1,4 +1,5 @@
 @page "/login"
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<IdentityUser> SignIn
 @inject UserManager<IdentityUser> UserMgr
@@ -7,71 +8,75 @@
 <h1>🔑 Login</h1>
 
 <div class="panel" style="max-width:420px">
+    @if (confirmed)
+    {
+        <p style="color:#6bff9e; margin-top:0">✅ Email confirmed! You can now log in.</p>
+    }
+    @if (resetDone)
+    {
+        <p style="color:#6bff9e; margin-top:0">✅ Password reset! Log in with your new password.</p>
+    }
     @if (!string.IsNullOrEmpty(error))
     {
-        <p style="color:#ff6b6b">@error</p>
+        <p style="color:#ff6b6b; margin-top:0">@error</p>
     }
-    <div style="display:flex; flex-direction:column; gap:.8rem">
+    <div style="display:flex; flex-direction:column; gap:.9rem">
         <div>
-            <label class="muted" style="font-size:.85rem">Username or Email</label>
-            <input @bind="input" placeholder="Username or email" style="width:100%; margin-top:.25rem" />
+            <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Username or Email</label>
+            <input @bind="input" @bind:event="oninput" placeholder="Username or email" style="width:100%" />
         </div>
         <div>
-            <label class="muted" style="font-size:.85rem">Password</label>
-            <input type="password" @bind="password" placeholder="Password" style="width:100%; margin-top:.25rem"
-                   @onkeydown="@(async e => { if (e.Key == "Enter") await DoLogin(); })" />
+            <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Password</label>
+            <input type="password" @bind="password" @bind:event="oninput" placeholder="Password" style="width:100%"
+                   @onkeydown="OnKey" />
         </div>
         <button @onclick="DoLogin" disabled="@busy">@(busy ? "Logging in…" : "Login")</button>
-        <p class="muted" style="font-size:.85rem; margin:0">
-            No account? <a href="/register">Register here</a> &nbsp;·&nbsp; <a href="/forgot-password">Forgot password?</a>
-        </p>
+        <div style="display:flex; gap:1rem; font-size:.85rem">
+            <a href="/register">Create account</a>
+            <a href="/forgot-password" style="margin-left:auto">Forgot password?</a>
+        </div>
     </div>
 </div>
 
 @code {
     private string input = "", password = "", error = "";
-    private bool busy;
+    private bool busy, confirmed, resetDone;
+
+    [SupplyParameterFromQuery] private string? confirmed_param { get; set; }
+    [SupplyParameterFromQuery] private string? reset { get; set; }
+
+    protected override void OnInitialized()
+    {
+        confirmed = confirmed_param == "1";
+        resetDone = reset == "1";
+    }
+
+    private async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await DoLogin(); }
 
     private async Task DoLogin()
     {
         error = "";
         if (string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(password))
-        {
-            error = "Please fill in all fields.";
-            return;
-        }
+        { error = "Please fill in all fields."; return; }
 
         busy = true;
-        // Support login by email or username
         var user = input.Contains('@')
             ? await UserMgr.FindByEmailAsync(input)
             : await UserMgr.FindByNameAsync(input);
 
         if (user is null)
-        {
-            error = "No account found with that username or email.";
-            busy = false;
-            return;
-        }
+        { error = "No account found with that username or email."; busy = false; return; }
 
         var result = await SignIn.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: true);
 
         if (result.Succeeded)
-        {
             Nav.NavigateTo("/", forceLoad: true);
-        }
         else if (result.IsLockedOut)
-        {
             error = "Account locked after too many failed attempts. Try again later.";
-        }
         else if (result.IsNotAllowed)
-        {
-            error = "Please confirm your email before logging in. Check your inbox.";
-        }
+            error = "Please confirm your email first — check your inbox for the 6-digit code.";
         else
-        {
             error = "Incorrect password.";
-        }
 
         busy = false;
     }

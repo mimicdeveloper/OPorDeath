@@ -1,9 +1,10 @@
 @page "/register"
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Identity.UI.Services
 @inject UserManager<IdentityUser> UserMgr
-@inject SignInManager<IdentityUser> SignIn
 @inject IEmailSender EmailSender
+@inject CodeStore Codes
 @inject NavigationManager Nav
 
 <h1>📝 Register</h1>
@@ -11,83 +12,111 @@
 <div class="panel" style="max-width:420px">
     @if (!string.IsNullOrEmpty(error))
     {
-        <p style="color:#ff6b6b">@error</p>
+        <p style="color:#ff6b6b; margin-top:0">@error</p>
     }
-    @if (sent)
+
+    @if (step == 1)
     {
-        <p style="color:#6bff9e">
-            ✅ Account created! A confirmation link has been sent to <strong>@email</strong>.
-            Check your inbox and click the link to activate your account, then <a href="/login">log in</a>.
-        </p>
+        <div style="display:flex; flex-direction:column; gap:.9rem">
+            <div>
+                <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Username</label>
+                <input @bind="username" @bind:event="oninput" placeholder="Choose a username" style="width:100%" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Email</label>
+                <input type="email" @bind="email" @bind:event="oninput" placeholder="your@email.com" style="width:100%" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Password</label>
+                <input type="password" @bind="password" @bind:event="oninput" placeholder="Min 8 chars, include a symbol" style="width:100%" />
+            </div>
+            <div>
+                <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Confirm Password</label>
+                <input type="password" @bind="confirm" @bind:event="oninput" placeholder="Repeat password" style="width:100%"
+                       @onkeydown="OnKey" />
+            </div>
+            <button @onclick="DoRegister" disabled="@busy">@(busy ? "Creating account…" : "Create Account")</button>
+            <a href="/login" style="font-size:.85rem">Already have an account?</a>
+        </div>
     }
     else
     {
-        <div style="display:flex; flex-direction:column; gap:.8rem">
+        <p class="muted" style="margin-top:0">
+            We sent a 6-digit code to <strong>@email</strong>. Enter it below to activate your account.
+        </p>
+        <div style="display:flex; flex-direction:column; gap:.9rem">
             <div>
-                <label class="muted" style="font-size:.85rem">Username</label>
-                <input @bind="username" placeholder="Choose a username" style="width:100%; margin-top:.25rem" />
+                <label class="muted" style="font-size:.85rem; display:block; margin-bottom:.25rem">Verification Code</label>
+                <input @bind="code" @bind:event="oninput" placeholder="123456" maxlength="6"
+                       style="width:100%; font-size:1.4rem; letter-spacing:.3rem; text-align:center"
+                       @onkeydown="OnCodeKey" />
             </div>
-            <div>
-                <label class="muted" style="font-size:.85rem">Email</label>
-                <input type="email" @bind="email" placeholder="your@email.com" style="width:100%; margin-top:.25rem" />
-            </div>
-            <div>
-                <label class="muted" style="font-size:.85rem">Password</label>
-                <input type="password" @bind="password" placeholder="Min 8 chars, include a symbol" style="width:100%; margin-top:.25rem" />
-            </div>
-            <div>
-                <label class="muted" style="font-size:.85rem">Confirm Password</label>
-                <input type="password" @bind="confirm" placeholder="Repeat password" style="width:100%; margin-top:.25rem"
-                       @onkeydown="@(async e => { if (e.Key == "Enter") await DoRegister(); })" />
-            </div>
-            <button @onclick="DoRegister" disabled="@busy">@(busy ? "Creating account…" : "Create Account")</button>
-            <p class="muted" style="font-size:.85rem; margin:0">
-                Already have an account? <a href="/login">Login here</a>
-            </p>
+            <button @onclick="DoVerify" disabled="@busy">@(busy ? "Verifying…" : "Confirm Email")</button>
+            <button class="secondary" @onclick="Resend" disabled="@busy">Resend code</button>
         </div>
     }
 </div>
 
 @code {
-    private string username = "", email = "", password = "", confirm = "", error = "";
-    private bool busy, sent;
+    private string username = "", email = "", password = "", confirm = "", code = "", error = "";
+    private bool busy;
+    private int step = 1;
+    private string? pendingUserId;
+
+    private async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await DoRegister(); }
+    private async Task OnCodeKey(KeyboardEventArgs e) { if (e.Key == "Enter") await DoVerify(); }
 
     private async Task DoRegister()
     {
         error = "";
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) ||
             string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirm))
-        {
-            error = "Please fill in all fields.";
-            return;
-        }
-        if (password != confirm)
-        {
-            error = "Passwords do not match.";
-            return;
-        }
+        { error = "Please fill in all fields."; return; }
+        if (password != confirm) { error = "Passwords do not match."; return; }
 
         busy = true;
         var user = new IdentityUser { UserName = username, Email = email };
         var result = await UserMgr.CreateAsync(user, password);
 
         if (!result.Succeeded)
+        { error = string.Join(" ", result.Errors.Select(e => e.Description)); busy = false; return; }
+
+        pendingUserId = user.Id;
+        await SendCode();
+        step = 2;
+        busy = false;
+    }
+
+    private async Task SendCode()
+    {
+        var c = Codes.Generate($"confirm:{email}");
+        await EmailSender.SendEmailAsync(email, "Your OP or Death verification code",
+            $"<div style='font-family:sans-serif'>" +
+            $"<h2>Welcome to OP or Death ☠</h2>" +
+            $"<p>Your verification code is:</p>" +
+            $"<p style='font-size:2.5rem; font-weight:bold; letter-spacing:.4rem; color:#e9b84c'>{c}</p>" +
+            $"<p style='color:#888; font-size:.85rem'>This code expires in 15 minutes.</p>" +
+            $"</div>");
+    }
+
+    private async Task Resend() { busy = true; await SendCode(); busy = false; }
+
+    private async Task DoVerify()
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(code)) { error = "Enter the code from your email."; return; }
+
+        busy = true;
+        if (!Codes.Validate($"confirm:{email}", code.Trim()))
+        { error = "Incorrect or expired code. Try again or resend."; busy = false; return; }
+
+        var user = await UserMgr.FindByIdAsync(pendingUserId!);
+        if (user is not null)
         {
-            error = string.Join(" ", result.Errors.Select(e => e.Description));
-            busy = false;
-            return;
+            var token = await UserMgr.GenerateEmailConfirmationTokenAsync(user);
+            await UserMgr.ConfirmEmailAsync(user, token);
         }
 
-        // Send confirmation email
-        var token = await UserMgr.GenerateEmailConfirmationTokenAsync(user);
-        var link = Nav.ToAbsoluteUri($"/confirm-email?userId={Uri.EscapeDataString(user.Id)}&token={Uri.EscapeDataString(token)}");
-        await EmailSender.SendEmailAsync(email, "Confirm your OP or Death account",
-            $"<p>Welcome to <strong>OP or Death</strong> ☠</p>" +
-            $"<p>Click the link below to confirm your email and activate your account:</p>" +
-            $"<p><a href='{link}'>Confirm Email</a></p>" +
-            $"<p class='muted' style='font-size:.85rem'>If you didn't register, ignore this email.</p>");
-
-        sent = true;
-        busy = false;
+        Nav.NavigateTo("/login?confirmed=1", forceLoad: true);
     }
 }
