@@ -235,22 +235,25 @@ button[title], a[title].btn-link{ cursor:pointer; }
 ::-webkit-scrollbar-thumb{ background:linear-gradient(var(--blood),var(--blood-2)); border-radius:6px; border:2px solid #0c0a0e; }
 ::-webkit-scrollbar-thumb:hover{ background:var(--gold); }
 
-/* ---- hamburger (hidden on desktop) ---- */
+/* ---- hamburger toggle (CSS-only, no JS) ---- */
+.nav-toggle-cb{ display:none; }
+
 .hamburger{
   display:none; margin-left:auto;
-  background:none; border:1px solid #3a2c40; border-radius:8px;
-  color:var(--gold); font-size:1.3rem; padding:.3rem .6rem;
-  cursor:pointer; box-shadow:none; line-height:1;
+  border:1px solid #3a2c40; border-radius:8px;
+  color:var(--gold); font-size:1.4rem; padding:.25rem .65rem;
+  cursor:pointer; line-height:1; user-select:none;
+  transition:border-color .15s;
 }
-.hamburger:hover{ border-color:var(--gold); filter:none; transform:none; box-shadow:none; }
+.hamburger:hover{ border-color:var(--gold); }
 
 /* ---- mobile ---- */
 @media (max-width:640px){
   .page{ flex-direction:column; }
 
   .sidebar{
-    width:100%; flex-direction:column;
-    padding:.7rem .9rem .4rem;
+    width:100%;
+    padding:.7rem .9rem .5rem;
     border-right:none; border-bottom:1px solid var(--line);
     box-shadow:none; position:relative; z-index:100;
   }
@@ -264,16 +267,22 @@ button[title], a[title].btn-link{ cursor:pointer; }
   .brand-sub{ display:none; }
   .hamburger{ display:block; }
 
-  /* nav links hidden by default, shown when open */
+  /* nav links hidden by default */
   .nav-links{
-    display:none; flex-direction:column; gap:.2rem;
+    display:none; flex-direction:column; gap:.15rem;
     padding-top:.5rem; margin-top:.5rem;
     border-top:1px solid var(--line);
+    max-height:75vh; overflow-y:auto;
   }
-  .mob-open .nav-links{ display:flex; }
+  /* shown when checkbox is checked */
+  .nav-toggle-cb:checked ~ .nav-links{ display:flex; }
+  /* swap ☰ to ✕ when open */
+  .nav-toggle-cb:checked ~ .brand .hamburger::before{ content:"✕"; }
+  .nav-toggle-cb:checked ~ .brand .hamburger{ content:"✕"; color:var(--blood); border-color:var(--blood); }
 
   .nav-item{ padding:.55rem .75rem; font-size:.95rem; }
-  .nav-ext{ margin-top:.3rem; }
+  .nav-divider{ margin:.5rem .2rem .1rem; }
+  .nav-ext{ margin-top:.2rem; }
 
   main{ padding:1rem .9rem; }
   h1{ font-size:1.8rem; }
