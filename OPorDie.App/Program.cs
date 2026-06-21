@@ -16,7 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Run on port 5099. (macOS uses port 5000 for its AirPlay Receiver, which
 // answers browser requests with a 403 — so we avoid 5000 entirely.)
-builder.WebHost.UseUrls("http://localhost:5099");
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5099";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // --- PHASE 1: register services into the dependency-injection container ---
 // "Dependency injection" just means: you list the tools here once, and the
