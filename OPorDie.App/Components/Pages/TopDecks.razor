@@ -52,16 +52,36 @@
                         </div>
 
                         <!-- DON!! deck -->
-                        <div style="background:#0e0b10; border:1px solid #2c2230; border-left:4px solid var(--gold);
-                                    border-radius:8px; padding:10px 14px; margin-bottom:.8rem; display:flex; align-items:center; gap:12px">
-                            <span style="font-size:1.5rem">⚡</span>
-                            <div>
-                                <div style="font-weight:700; color:var(--gold); font-size:.85rem">DON!! Deck — 10 cards</div>
-                                <div class="muted" style="font-size:.75rem">
-                                    Any DON!! card is legal regardless of color. Pick the art you like from any starter deck
-                                    (e.g. ST01, ST02 … ST13). All DON!! cards have identical effects.
-                                </div>
-                            </div>
+                        <p class="muted" style="font-size:.78rem; margin:.4rem 0 .3rem; text-transform:uppercase; letter-spacing:1px">DON!! Deck (×10)</p>
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:.5rem">
+                            <span class="muted" style="font-size:.75rem">Any DON!! art is legal. Enter your card number to preview:</span>
+                            <input placeholder="e.g. ST01-016"
+                                   value="@GetDon(d.LeaderNumber)"
+                                   @oninput="e => SetDon(d.LeaderNumber, e.Value?.ToString())"
+                                   style="width:130px; font-family:monospace; font-size:.8rem"
+                                   title="Type any DON!! card number to show its art (×10 in your DON!! deck)" />
+                        </div>
+                        @{ var donNum = GetDon(d.LeaderNumber); }
+                        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:.8rem">
+                            @for (int i = 0; i < 10; i++)
+                            {
+                                if (!string.IsNullOrWhiteSpace(donNum))
+                                {
+                                    <div style="width:70px; flex-shrink:0">
+                                        <img src="@CardImages.Url(donNum)" alt="DON!!"
+                                             style="width:100%; border-radius:5px; display:block; border:1px solid var(--gold)" loading="lazy" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="width:70px; height:98px; flex-shrink:0; border-radius:5px; border:2px solid #e9b84c;
+                                                background:linear-gradient(135deg,#1a1500,#2a2000);
+                                                display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px">
+                                        <span style="font-size:1.1rem">⚡</span>
+                                        <span style="font-size:.5rem; color:#e9b84c; font-weight:700; letter-spacing:1px">DON!!</span>
+                                    </div>
+                                }
+                            }
                         </div>
 
                         <!-- Main deck -->
@@ -199,6 +219,14 @@
     private string deckMsg = "";
     private string rawList = "", importName = "Imported Deck", status = "";
     private List<(string number, int qty)> parsed = new();
+
+    private readonly Dictionary<string, string> donNumbers = new();
+
+    private string GetDon(string leaderNumber) =>
+        donNumbers.TryGetValue(leaderNumber, out var v) ? v : "";
+
+    private void SetDon(string leaderNumber, string? number) =>
+        donNumbers[leaderNumber] = (number ?? "").Trim().ToUpperInvariant();
 
     private void Toggle(DeckEntry d) { expanded = expanded == d ? null : d; deckMsg = ""; }
 
