@@ -235,17 +235,15 @@ button[title], a[title].btn-link{ cursor:pointer; }
 ::-webkit-scrollbar-thumb{ background:linear-gradient(var(--blood),var(--blood-2)); border-radius:6px; border:2px solid #0c0a0e; }
 ::-webkit-scrollbar-thumb:hover{ background:var(--gold); }
 
-/* ---- hamburger toggle (CSS-only, no JS) ---- */
-.nav-toggle-cb{ display:none; }
-
+/* ---- hamburger button (mobile only) ---- */
 .hamburger{
   display:none; margin-left:auto;
-  border:1px solid #3a2c40; border-radius:8px;
+  background:none; border:1px solid #3a2c40; border-radius:8px;
   color:var(--gold); font-size:1.4rem; padding:.25rem .65rem;
-  cursor:pointer; line-height:1; user-select:none;
+  cursor:pointer; line-height:1; user-select:none; box-shadow:none;
   transition:border-color .15s;
 }
-.hamburger:hover{ border-color:var(--gold); }
+.hamburger:hover{ border-color:var(--gold); filter:none; transform:none; box-shadow:none; }
 
 /* ---- mobile ---- */
 @media (max-width:640px){
@@ -267,18 +265,14 @@ button[title], a[title].btn-link{ cursor:pointer; }
   .brand-sub{ display:none; }
   .hamburger{ display:block; }
 
-  /* nav links hidden by default */
+  /* nav links hidden by default, shown when JS adds .open */
   .nav-links{
     display:none; flex-direction:column; gap:.15rem;
     padding-top:.5rem; margin-top:.5rem;
     border-top:1px solid var(--line);
     max-height:75vh; overflow-y:auto;
   }
-  /* shown when checkbox is checked */
-  .nav-toggle-cb:checked ~ .nav-links{ display:flex; }
-  /* swap ☰ to ✕ when open */
-  .nav-toggle-cb:checked ~ .brand .hamburger::before{ content:"✕"; }
-  .nav-toggle-cb:checked ~ .brand .hamburger{ content:"✕"; color:var(--blood); border-color:var(--blood); }
+  .nav-links.open{ display:flex; }
 
   .nav-item{ padding:.55rem .75rem; font-size:.95rem; }
   .nav-divider{ margin:.5rem .2rem .1rem; }

@@ -19,5 +19,21 @@
     <Routes />
     @* This script is the Blazor engine that connects buttons to your C#. *@
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.hamburger');
+            if (btn) {
+                var links = document.querySelector('.nav-links');
+                var open = links.classList.toggle('open');
+                btn.textContent = open ? '✕' : '☰';
+            } else if (!e.target.closest('.sidebar')) {
+                // close menu when clicking outside
+                var links = document.querySelector('.nav-links');
+                if (links) { links.classList.remove('open'); }
+                var ham = document.querySelector('.hamburger');
+                if (ham) ham.textContent = '☰';
+            }
+        });
+    </script>
 </body>
 </html>
