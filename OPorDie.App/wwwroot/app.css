@@ -136,7 +136,7 @@ button.secondary:hover{ border-color:var(--gold); }
 .rarity.UC { background:#2f6f4f; color:#d8ffe9; }
 .rarity.R  { background:#2f5fae; color:#dceaff; }
 .rarity.SR { background:linear-gradient(180deg,#8e51c4,#6a2f9e); color:#f4e6ff; box-shadow:0 0 8px rgba(142,81,196,.5); }
-.rarity.SEC{ background:linear-gradient(180deg,#f0c453,#c79a2a); color:#1a1400; box-shadow:0 0 10px rgba(233,184,76,.6); }
+.rarity.SEC,.rarity.SP{ background:linear-gradient(180deg,#f0c453,#c79a2a); color:#1a1400; box-shadow:0 0 10px rgba(233,184,76,.6); }
 .rarity.L  { background:linear-gradient(180deg,#e0303b,#9c1620); color:#ffe7e7; }
 
 /* ---- stat cards ---- */

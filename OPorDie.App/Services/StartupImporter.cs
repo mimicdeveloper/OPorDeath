@@ -3,11 +3,6 @@ using OPorDie.Data;
 
 namespace OPorDie.Services;
 
-// Runs once in the background when the app starts. If the database only has the
-// handful of sample cards, it pulls the FULL card list from optcgapi.com so the
-// Deck Builder and Browse have every card with no manual step. It runs on a
-// background thread so it never slows down startup, and it's safe to fail
-// (you can always use the Import Cards page to retry).
 public class StartupImporter : IHostedService
 {
     private readonly IServiceProvider _services;
@@ -21,7 +16,6 @@ public class StartupImporter : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Fire-and-forget so the web server starts immediately.
         _ = Task.Run(RunAsync);
         return Task.CompletedTask;
     }
@@ -33,17 +27,16 @@ public class StartupImporter : IHostedService
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // If we already have a real card pool, don't re-download.
             if (await db.Cards.CountAsync() > 100) return;
 
-            _log.LogInformation("Auto-importing full card database from optcgapi.com…");
-            var importer = scope.ServiceProvider.GetRequiredService<CardImporter>();
-            var n = await importer.ImportAllAsync();
+            _log.LogInformation("Auto-importing full card database from Bandai…");
+            var scraper = scope.ServiceProvider.GetRequiredService<BandaiScraper>();
+            var n = await scraper.ImportAllAsync();
             _log.LogInformation("Auto-import complete: {Count} cards.", n);
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex, "Auto-import failed; use the Import Cards page to retry.");
+            _log.LogWarning(ex, "Auto-import from Bandai failed on startup.");
         }
     }
 

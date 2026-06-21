@@ -65,7 +65,7 @@
             <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-top:.3rem">
                 <button @onclick="() => AddToCollection(selected)">+ Add to collection</button>
                 <a class="btn-link secondary-link" target="_blank"
-                   href="@($"https://www.tcgplayer.com/search/one-piece-card-game/product?q={Uri.EscapeDataString(selected.CardNumber)}")">
+                   href="@($"https://www.tcgplayer.com/search/one-piece-card-game/product?q={Uri.EscapeDataString(TcgPlayerQuery(selected))}")">
                     📈 Price & history on TCGplayer
                 </a>
             </div>
@@ -112,6 +112,17 @@
 
     private void Prev() { if (page > 0) page--; }
     private void Next(int totalPages) { if (page < totalPages - 1) page++; }
+
+    private static string TcgPlayerQuery(Card card)
+    {
+        var suffix = card.Rarity switch
+        {
+            "SEC" or "SP" => " (SP)",
+            "Reprint" or "RP" => " (Reprint)",
+            _ => ""
+        };
+        return card.CardNumber + suffix;
+    }
 
     private async Task AddToCollection(Card card)
     {
