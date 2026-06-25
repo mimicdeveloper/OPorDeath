@@ -64,6 +64,9 @@ a{ color:var(--gold); }
 }
 .brand-sub{ font-size:.6rem; letter-spacing:2px; color:var(--muted); margin-top:.3rem; }
 
+/* nav-links: flex column on all screen sizes; mobile media query hides/shows it */
+.nav-links{ display:flex; flex-direction:column; gap:.15rem; }
+
 .nav-item{
   color:#cfc7bd; text-decoration:none; padding:.6rem .75rem; border-radius:9px;
   font-size:.95rem; border:1px solid transparent; transition:.14s;
